@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="dados.js"></script>
+<script src="simulador.js"></script>
 <script src="operacoes.js"></script>
 <style>
 :root{
@@ -43,7 +44,7 @@ h1{font-size:24px;margin:0;letter-spacing:-.02em}
 .chip{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
 .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
-.item{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.item{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:clip}
 .linha{display:grid;grid-template-columns:14px 1fr auto;gap:12px;align-items:center;padding:14px 16px;cursor:pointer}
 .dot{width:14px;height:14px;border-radius:50%}
 .dot.verde{background:var(--verde)}.dot.amarelo{background:var(--amarelo)}.dot.vermelho{background:var(--vermelho)}
@@ -116,6 +117,23 @@ a{color:var(--accent)}
 .opcao dl{margin:auto 0 0;display:grid;grid-template-columns:1fr auto;gap:5px 8px;font-size:12px;border-top:1px solid var(--line);padding-top:8px}
 .opcao dt{color:var(--muted)}.opcao dd{margin:0;text-align:right}
 .cols2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.sim{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:18px}
+.sim-ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 18px;margin-bottom:12px}
+.sim-ctl label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
+.sim-ctl label b{color:var(--ink);font-size:14px}
+.sim-ctl label .lin{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sim-ctl label.mud b{color:var(--accent)}
+.sim-ctl input[type=range]{width:100%;accent-color:var(--accent)}
+.sim-ctl select{font:inherit;font-size:13px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.sim-ctl .grupo{grid-column:1/-1;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.sim .opcoes{margin-bottom:10px}
+.sim .smarg{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:4px 0 2px}
+.sim .smarg.verde{color:var(--verde)}.sim .smarg.amarelo{color:var(--amarelo)}.sim .smarg.vermelho{color:var(--vermelho)}
+.sim .smarg span{display:block;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0}
+.sim-fixo{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:4px 14px;background:var(--card);border-bottom:1px solid var(--line);margin:-14px -14px 12px;padding:10px 14px;border-radius:12px 12px 0 0;font-size:12.5px}
+.sim-fixo b{font-size:15px}.sim-fixo .verde{color:var(--verde)}.sim-fixo .amarelo{color:var(--amarelo)}.sim-fixo .vermelho{color:var(--vermelho)}
+.sim-max{font-size:13px;margin:0 0 8px;padding:8px 10px;border-radius:8px;background:var(--chip)}
+.sim-rodape{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)}
 .bloco{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
 .bloco h3{margin-top:0}
 .barras{display:flex;flex-direction:column;gap:9px;margin:6px 0 12px}
@@ -464,6 +482,8 @@ function detalhe(i){
     ${veredito}
     <h3>Compare as formas de pagar</h3>
     <div class="opcoes">${cards}</div>
+    <h3>Simule</h3>
+    <div class="sim" data-sim="${i.id}"></div>
     <div class="cols2">${vendaBox}${destino}</div>
     <details class="tec" data-id="${i.id}">
       <summary>Detalhes técnicos — tabela completa, custos, prazo de venda e quando quitar</summary>
@@ -478,6 +498,101 @@ function detalhe(i){
       <h3>Quando quitar ou antecipar</h3>${quit}${fin}${cons}
     </details>
     ${i.url?`<p><a href="${i.url}" target="_blank" rel="noopener">Abrir anúncio / edital ↗</a></p>`:""}`;
+}
+
+// ---------- simulador: mexe nas premissas e recalcula na hora (docs/simulador.js) ----------
+function simulador(box, i){
+  const S = D.simulador, P = i.analise.premissas, a = i.analise;
+  const fator = i.area * (1 - S.referencia.desconto_negociacao) * (1 + S.referencia.premio_reformado);
+  const fins = S.financiamentos, cons = S.consorcios;
+  const semCredito = i.aceita_financiamento === false;
+  const meta = D.meta.margem_minima, alerta = D.meta.margem_alerta, base = a.base || "margem";
+  const r5 = (v, s) => Math.round(v / s) * s;
+  const inicial = () => ({
+    preco: P.preco, venda_m2: P.venda_bruta / fator, reforma_m2: P.reforma / i.area,   // exatos: batem com a análise
+    meses_reforma: P.meses_reforma, meses_venda: P.meses_venda,
+    fin: 0, taxa: fins[0] ? fins[0].taxa_aa * 100 : 0, entrada: fins[0] ? fins[0].entrada_pct * 100 : 0,
+    con: 0, agio: cons[0] ? cons[0].agio_pct * 100 : 0 });
+  const ini = inicial();
+  let v = { ...ini };
+  const pmin = r5(P.preco * 0.5, 5000), pmax = r5(P.preco * 1.3, 5000);
+  const ctl = (k, rotulo, min, max, step, fmt) =>
+    `<label data-k="${k}"><span class="lin">${rotulo}<b data-v="${k}"></b></span>
+      <input type="range" min="${min}" max="${max}" step="${step}" data-k="${k}"></label>`;
+  const sel = (k, rotulo, lista) => `<label>${rotulo}<select data-k="${k}">${lista.map((o, n) => `<option value="${n}">${o.nome}</option>`).join("")}</select></label>`;
+  const fmt = { preco: brl, venda_m2: x => brl(x) + "/m²", reforma_m2: x => brl(x) + "/m²",
+    meses_reforma: x => x + (x == 1 ? " mês" : " meses"), meses_venda: x => x + (x == 1 ? " mês" : " meses"),
+    taxa: x => x.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) + "% a.a.", entrada: x => x + "%", agio: x => x + "% da carta" };
+
+  box.innerHTML = `
+    <div class="sim-fixo" data-fixo></div>
+    <p class="nota" style="margin:0 0 10px;font-size:12px;color:var(--muted)">Mexa nos valores e veja a margem mudar. É a mesma conta da análise acima; nada é salvo.</p>
+    <div class="sim-ctl">
+      <div class="grupo">Imóvel e obra</div>
+      ${ctl("preco", i.origem === "leilao" ? "Lance / preço de compra" : "Preço de compra", pmin, pmax, 5000)}
+      ${ctl("venda_m2", "Preço de venda (m² do bairro)", r5(ini.venda_m2 * 0.7, 100), r5(ini.venda_m2 * 1.3, 100), 100)}
+      ${ctl("reforma_m2", "Custo da reforma", 0, 5000, 100)}
+      ${ctl("meses_reforma", "Meses de obra", 1, 12, 1)}
+      ${ctl("meses_venda", "Meses até vender", 1, 24, 1)}
+      ${fins.length && !semCredito ? `<div class="grupo">Financiamento bancário</div>
+      ${sel("fin", "Oferta", fins)}${ctl("taxa", "Taxa de juros", 6, 20, 0.25)}${ctl("entrada", "Entrada", 10, 80, 5)}` : ""}
+      ${cons.length && !semCredito ? `<div class="grupo">Carta de consórcio contemplada</div>
+      ${sel("con", "Oferta", cons)}${ctl("agio", "Ágio pago pela carta", 0, 45, 1)}` : ""}
+    </div>
+    <div class="opcoes" data-out></div>
+    <p class="sim-max" data-max></p>
+    <div class="sim-rodape"><span data-resumo></span><button class="chip" data-reset>Voltar aos valores da análise</button></div>`;
+
+  const out = box.querySelector("[data-out]"), maxEl = box.querySelector("[data-max]"), resumo = box.querySelector("[data-resumo]");
+  const cor = m => m >= meta ? "verde" : m >= alerta ? "amarelo" : "vermelho";
+  const ofertas = () => {
+    const l = [{ rot: "À vista", of: null }];
+    if (!semCredito && fins.length) l.push({ rot: fins[v.fin].nome, of: { ...fins[v.fin], tipo: "financiamento", taxa_aa: v.taxa / 100, entrada_pct: v.entrada / 100 } });
+    if (!semCredito && cons.length) l.push({ rot: cons[v.con].nome.replace("Carta contemplada", "Consórcio"), of: { ...cons[v.con], tipo: "consorcio", agio_pct: v.agio / 100 } });
+    return l;
+  };
+
+  function desenhar(){
+    box.querySelectorAll("input[type=range]").forEach(el => {
+      const k = el.dataset.k; el.value = v[k];
+      box.querySelector(`[data-v="${k}"]`).textContent = fmt[k](+v[k]);
+      el.closest("label").classList.toggle("mud", Math.abs(v[k] - ini[k]) > 1e-9);
+    });
+    box.querySelectorAll("select").forEach(el => el.value = v[el.dataset.k]);
+    const aj = { preco: +v.preco, venda_m2: +v.venda_m2, reforma_m2: +v.reforma_m2, meses_reforma: +v.meses_reforma, meses_venda: +v.meses_venda };
+    const p = SIM.premissas(P, i.area, i.origem, aj, S);
+    const res = ofertas().map(o => ({ ...o, r: SIM.resultado(p, o.of) }));
+    const val = r => r[base] || 0;
+    out.innerHTML = res.map(({ rot, r }) => `
+      <div class="opcao">
+        <div class="onome">${rot}</div>
+        <div class="smarg ${cor(val(r))}">${pct(val(r))}<span>${base === "margem" ? "margem líquida" : "retorno s/ seu dinheiro"}</span></div>
+        <dl>
+          <dt>Lucro</dt><dd class="${r.lucro < 0 ? "neg" : ""}"><b>${brl(r.lucro)}</b></dd>
+          <dt>Do seu bolso</dt><dd>${brl(r.capital_proprio)}</dd>
+          <dt>Retorno s/ seu dinheiro</dt><dd>${pct(r.roi_capital)}</dd>
+          ${r.tipo === "financiamento" ? `<dt>1ª parcela</dt><dd>${brl(r.detalhes.primeira_parcela)}</dd>` : ""}
+          ${r.tipo === "consorcio" ? `<dt>Ágio</dt><dd>${brl(r.detalhes.agio)}</dd><dt>Parcela</dt><dd>${brl(r.detalhes.parcela_inicial)}</dd>` : ""}
+        </dl>
+      </div>`).join("");
+    const maxs = res.map(({ rot, of }) => ({ rot, x: SIM.precoMaximo(P, i.area, i.origem, aj, S, of, meta, base) }));
+    maxEl.innerHTML = `Para bater <b>${pct(meta, 0)}</b>, ${i.origem === "leilao" ? "dê lance de" : "pague"} no máximo: ` +
+      maxs.map(m => `${m.rot} <b>${m.x ? brl(r5(m.x, 1000)) : "nenhum preço"}</b>`).join(" · ");
+    box.querySelector("[data-fixo]").innerHTML = res.map(({ rot, r }) =>
+      `<span>${rot.replace(" (SAC)", "").replace(" (Price)", "").replace("Consórcio — ", "Carta ")} <b class="${cor(val(r))}">${pct(val(r))}</b></span>`).join("");
+    const r0 = res[0].r;
+    resumo.textContent = `Prazo total ${r0.prazo_meses} meses · venda estimada ${brl(r0.venda_bruta)} · IR ${brl(r0.ir)}`;
+  }
+
+  box.addEventListener("input", e => {
+    const k = e.target.dataset.k; if (!k) return;
+    v[k] = +e.target.value;
+    if (k === "fin") { v.taxa = fins[v.fin].taxa_aa * 100; v.entrada = fins[v.fin].entrada_pct * 100; ini.taxa = v.taxa; ini.entrada = v.entrada; }
+    if (k === "con") { v.agio = cons[v.con].agio_pct * 100; ini.agio = v.agio; }
+    desenhar();
+  });
+  box.querySelector("[data-reset]").onclick = () => { v = inicial(); Object.assign(ini, v); desenhar(); };
+  desenhar();
 }
 
 function sensGrafico(i){
@@ -530,6 +645,7 @@ function alternar(el){
   const i = D.imoveis[+el.id.slice(2)], det = el.querySelector(".det");
   if (!det.innerHTML) {
     det.innerHTML = detalhe(i);
+    const sb = det.querySelector("[data-sim]"); if (sb && i.analise.premissas && window.SIM) simulador(sb, i);
     det.querySelector("details.tec").addEventListener("toggle", e => { if (e.target.open) sensGrafico(i); });
   }
   el.classList.toggle("aberto");
