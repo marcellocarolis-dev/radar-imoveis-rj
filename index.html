@@ -16,10 +16,7 @@
   --accent:#1f5f8b;--verde:#1e8a5a;--amarelo:#c58a12;--vermelho:#c0392b;
   --verde-bg:#e3f3ea;--amarelo-bg:#fbf0d6;--vermelho-bg:#f8e1de;--chip:#eceae4;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#14161a;--card:#1d2026;--ink:#eceef2;--muted:#9aa0aa;--line:#2c3038;
-  --accent:#6aaee0;--verde:#4cc38a;--amarelo:#e5b143;--vermelho:#ef6f61;
-  --verde-bg:#17352a;--amarelo-bg:#3a3020;--vermelho-bg:#3b2220;--chip:#272b32;}}
+/* claro por padrão (pedido do Marcello em 10/10); escuro só pelo botão "alternar tema" */
 :root[data-theme="dark"]{
   --bg:#14161a;--card:#1d2026;--ink:#eceef2;--muted:#9aa0aa;--line:#2c3038;
   --accent:#6aaee0;--verde:#4cc38a;--amarelo:#e5b143;--vermelho:#ef6f61;
@@ -132,6 +129,19 @@ a{color:var(--accent)}
 .sim .smarg span{display:block;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0}
 .sim-fixo{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:4px 14px;background:var(--card);border-bottom:1px solid var(--line);margin:-14px -14px 12px;padding:10px 14px;border-radius:12px 12px 0 0;font-size:12.5px}
 .sim-fixo b{font-size:15px}.sim-fixo .verde{color:var(--verde)}.sim-fixo .amarelo{color:var(--amarelo)}.sim-fixo .vermelho{color:var(--vermelho)}
+.acoes{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.chip.prim{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.cad{margin-bottom:16px}
+.cad h2{margin-bottom:2px}
+.cad-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 16px;margin:12px 0}
+.cad-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.cad-grid label small{font-size:11px}
+.cad-grid input,.cad-grid select{font:inherit;font-size:14px;padding:7px 9px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.cad-grid .larga{grid-column:1/-1}
+.cad-grid .grupo{grid-column:1/-1;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.cad-erro{color:var(--vermelho);font-size:13px;min-height:18px;margin:0 0 6px}
+.tag.meu{background:var(--verde);color:#fff}
+.cad-acoes{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
 .sim-max{font-size:13px;margin:0 0 8px;padding:8px 10px;border-radius:8px;background:var(--chip)}
 .sim-rodape{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)}
 .bloco{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
@@ -256,6 +266,11 @@ details.tec[open] summary{margin-bottom:10px}
       <div class="chart"><canvas id="gDispersao"></canvas></div>
     </div>
   </section>
+  <div class="acoes">
+    <button class="chip prim" id="btnCad">+ Cadastrar imóvel</button>
+    <button class="chip" id="btnCsv" hidden>Baixar meus cadastros (planilha)</button>
+  </div>
+  <div class="card cad" id="cad" hidden></div>
   <div class="filtros" id="filtros"></div>
   <section id="lista"></section>
   <p class="sub" style="margin-top:24px">Estimativas para triagem. Antes de qualquer lance ou proposta: visite o imóvel, leia edital e matrícula, confirme dívidas e consulte um profissional.</p>
@@ -272,8 +287,7 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 
 // tema manual
 $("#tema").onclick = () => {
-  const r = document.documentElement, escuro = matchMedia("(prefers-color-scheme: dark)").matches;
-  const atual = r.dataset.theme || (escuro ? "dark" : "light");
+  const r = document.documentElement, atual = r.dataset.theme || "light";
   r.dataset.theme = atual === "dark" ? "light" : "dark";
   try { localStorage.setItem("tema", r.dataset.theme); } catch(e) {}
   desenharGraficos();
@@ -281,6 +295,42 @@ $("#tema").onclick = () => {
 try { const t = localStorage.getItem("tema"); if (t) document.documentElement.dataset.theme = t; } catch(e) {}
 
 if (!D) { $("#lista").innerHTML = '<div class="vazio">Sem dados. Rode <b>python analisar.py</b> para gerar docs/dados.js.</div>'; return; }
+
+// ---------- imóveis cadastrados por você (ficam neste navegador) ----------
+const CAD_CHAVE = "radar_cadastros";
+const lerCad = () => { try { return JSON.parse(localStorage.getItem(CAD_CHAVE) || "[]"); } catch (e) { return []; } };
+const gravarCad = l => { try { localStorage.setItem(CAD_CHAVE, JSON.stringify(l)); return true; } catch (e) { return false; } };
+const C = D.simulador;
+
+function refDoCadastro(c){
+  if (c.venda_m2) return { ref_m2: c.venda_m2, p25: c.venda_m2 * 0.9, p75: c.venda_m2 * 1.1, fonte: "valor informado por você" };
+  const rb = D.bairros[c.bairro]; if (!rb) return null;
+  const lim = C.referencia.faixas_area || [0, 9999];
+  for (let k = 0; k + 1 < lim.length; k++) if (c.area >= lim[k] && c.area < lim[k + 1]) {
+    const nome = lim[k + 1] < 9999 ? `${lim[k]}–${lim[k + 1]}` : `${lim[k]}+`;
+    if (rb.faixas && rb.faixas[nome]) return rb.faixas[nome];
+  }
+  return rb;
+}
+
+function imovelDoCadastro(c){
+  const rb = refDoCadastro(c); if (!rb || !C) return null;
+  const im = { id: c.id, cadastro: true, origem: c.origem, fonte: "Meu cadastro",
+    titulo: c.titulo || `Apartamento ${Math.round(c.area)} m² — ${c.bairro}`, bairro: c.bairro, endereco: c.endereco || "",
+    preco: c.preco, area: c.area, quartos: c.quartos ?? null, vagas: null, condominio: c.condominio || null, iptu: c.iptu || null,
+    url: c.url || "", valor_avaliacao: null, data_leilao: null, modalidade: null,
+    ocupado: c.ocupado ?? null, aceita_financiamento: c.aceita_financiamento ?? null,
+    debitos: c.debitos || null, reforma_m2: c.reforma_m2 || null };
+  return SIM.analiseCompleta(im, rb, C);
+}
+
+if (window.SIM && C) {
+  const meus = lerCad().map(imovelDoCadastro).filter(Boolean);
+  if (meus.length) {
+    D.imoveis = D.imoveis.filter(i => !i.cadastro).concat(meus);
+    D.imoveis.sort((x, y) => y.analise.margem_melhor - x.analise.margem_melhor);
+  }
+}
 
 const baseNome = D.imoveis[0]?.analise.base === "roi_capital" ? "retorno s/ capital próprio" : "margem líquida";
 $("#sub").textContent = `${Object.keys(D.bairros).join(" · ")} — atualizado em ${D.gerado_em} — meta: ${baseNome} ≥ ${pct(D.meta.margem_minima,0)}`;
@@ -333,9 +383,9 @@ function chips(){
   const grupo = (chave, opcoes) => opcoes.map(([v,l]) => `<button class="chip ${F[chave]===v?"on":""}" data-k="${chave}" data-v="${v}">${l}</button>`).join("");
   $("#filtros").innerHTML =
     grupo("bairro", [["todos","Todos"], ...Object.keys(D.bairros).map(b => [b,b])]) + '<span class="sep"></span>' +
-    grupo("origem", [["todas","Leilão + venda"],["leilao","Leilão"],["venda","Venda"]]) + '<span class="sep"></span>' +
+    grupo("origem", [["todas","Leilão + venda"],["leilao","Leilão"],["venda","Venda"], ...(D.imoveis.some(i => i.cadastro) ? [["meus","Meus cadastros"]] : [])]) + '<span class="sep"></span>' +
     grupo("sem", [["todos","Todos"],["verde","Só verdes"],["amarelo","Verdes + amarelos"]]);
-  document.querySelectorAll(".chip").forEach(c => c.onclick = () => { F[c.dataset.k] = c.dataset.v; chips(); lista(); });
+  document.querySelectorAll("#filtros .chip").forEach(c => c.onclick = () => { F[c.dataset.k] = c.dataset.v; chips(); lista(); });
 }
 
 // ---------- lista ----------
@@ -497,7 +547,8 @@ function detalhe(i){
       </div>
       <h3>Quando quitar ou antecipar</h3>${quit}${fin}${cons}
     </details>
-    ${i.url?`<p><a href="${i.url}" target="_blank" rel="noopener">Abrir anúncio / edital ↗</a></p>`:""}`;
+    ${i.url?`<p><a href="${i.url}" target="_blank" rel="noopener">Abrir anúncio / edital ↗</a></p>`:""}
+    ${i.cadastro ? `<div class="cad-acoes"><button class="chip" data-editar="${i.id}">Editar dados</button><button class="chip" data-excluir="${i.id}">Excluir cadastro</button></div>` : ""}`;
 }
 
 // ---------- simulador: mexe nas premissas e recalcula na hora (docs/simulador.js) ----------
@@ -614,7 +665,7 @@ function sensGrafico(i){
 function filtrados(){
   return D.imoveis.filter(i =>
     (F.bairro==="todos" || i.bairro===F.bairro) &&
-    (F.origem==="todas" || i.origem===F.origem) &&
+    (F.origem==="todas" || (F.origem==="meus" ? i.cadastro : i.origem===F.origem)) &&
     (F.sem==="todos" || (F.sem==="verde" ? i.analise.semaforo==="verde" : i.analise.semaforo!=="vermelho")));
 }
 
@@ -628,7 +679,7 @@ function lista(){
         <span class="dot ${a.semaforo}"></span>
         <div>
           <div class="tit">${i.titulo}</div>
-          <div class="meta"><span class="tag ${i.origem}">${i.origem==="leilao"?"Leilão":"Venda"}</span>
+          <div class="meta">${i.cadastro ? '<span class="tag meu">Meu cadastro</span>' : ""}<span class="tag ${i.origem}">${i.origem==="leilao"?"Leilão":"Venda"}</span>
             <span>${i.bairro}</span><span>${brl(i.preco)}</span><span>${Math.round(i.area)} m²</span>
             <span>${brl(i.preco_m2)}/m² (${pct(i.desconto_mercado,0)} vs ${brl(ref)})</span>
             ${i.data_leilao?`<span>leilão ${i.data_leilao}</span>`:""}</div>
@@ -657,7 +708,98 @@ function abrir(idx){
   el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+// ---------- formulário de cadastro ----------
+const numBR = s => { s = String(s ?? "").trim(); if (!s) return null;
+  s = s.replace(/[^\d,.-]/g, ""); if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if ((s.match(/\./g) || []).length > 1 || /\.\d{3}$/.test(s)) s = s.replace(/\./g, "");
+  const v = parseFloat(s); return isNaN(v) ? null : v; };
+const triBool = v => v === "sim" ? true : v === "nao" ? false : null;
+const deBool = v => v === true ? "sim" : v === false ? "nao" : "";
+
+function abrirCadastro(c = {}){
+  const box = $("#cad"), bairros = Object.keys(D.bairros);
+  const campo = (k, rot, ajuda = "", attrs = "") => `<label>${rot}<input data-c="${k}" ${attrs} value="${c[k] ?? ""}">${ajuda ? `<small>${ajuda}</small>` : ""}</label>`;
+  const opc = (k, rot, lista) => `<label>${rot}<select data-c="${k}">${lista.map(([v, l]) => `<option value="${v}" ${String(c[k] ?? "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>`;
+  const outro = c.bairro && !bairros.includes(c.bairro);
+  box.innerHTML = `
+    <h2>${c.id ? "Editar imóvel" : "Cadastrar imóvel"}</h2>
+    <p class="nota">O sistema calcula tudo como faz com os imóveis da busca: formas de pagar, cenários, prazo e preço máximo.
+      Campos vazios usam as estimativas do sistema. O cadastro fica salvo <b>neste aparelho</b>.</p>
+    <div class="cad-grid">
+      ${campo("titulo", "Nome (para você reconhecer)", "", 'class="larga" placeholder="ex.: Apto Rua Barata Ribeiro"')}
+      ${opc("bairro", "Bairro", [...bairros.map(b => [b, b]), ["__outro", "Outro bairro"]])}
+      <label data-outro ${outro ? "" : "hidden"}>Nome do bairro<input data-c="bairro_outro" value="${outro ? c.bairro : ""}"></label>
+      ${opc("origem", "Tipo", [["venda", "Anúncio / venda direta"], ["leilao", "Leilão"]])}
+      ${campo("preco", "Preço pedido ou lance (R$)", "", 'inputmode="decimal" placeholder="360.000"')}
+      ${campo("area", "Área útil (m²)", "", 'inputmode="decimal" placeholder="47"')}
+      ${campo("quartos", "Quartos", "", 'inputmode="numeric" placeholder="1"')}
+      <div class="grupo">Custos (vazio = estimativa do sistema)</div>
+      ${campo("condominio", "Condomínio por mês (R$)", `estimativa: R$ ${C.manutencao.condominio_m2}/m²`, 'inputmode="decimal"')}
+      ${campo("iptu", "IPTU por mês (R$)", `estimativa: R$ ${C.manutencao.iptu_m2_mensal}/m²`, 'inputmode="decimal"')}
+      ${campo("debitos", "Dívidas a quitar (R$)", "condomínio/IPTU atrasados", 'inputmode="decimal"')}
+      ${campo("reforma_m2", "Reforma (R$ por m²)", `padrão: R$ ${C.reforma.custo_m2}/m²`, 'inputmode="decimal"')}
+      ${campo("venda_m2", "Preço de venda do m² após reforma", "vazio = o sistema usa os anúncios do bairro do mesmo tamanho", 'inputmode="decimal"')}
+      <div class="grupo">Situação</div>
+      ${opc("ocupado", "Está ocupado?", [["nao", "Não"], ["sim", "Sim"], ["", "Não sei"]].map(([v, l]) => [v, l]))}
+      ${opc("aceita_financiamento", "Aceita financiamento / carta?", [["", "Sim / não sei"], ["nao", "Não, só à vista"]])}
+      ${campo("endereco", "Endereço", "", 'class="larga"')}
+      ${campo("url", "Link do anúncio ou edital", "", 'class="larga" placeholder="https://"')}
+    </div>
+    <p class="cad-erro" data-erro></p>
+    <div class="cad-acoes"><button class="chip prim" data-salvar>${c.id ? "Salvar e recalcular" : "Calcular e salvar"}</button><button class="chip" data-cancelar>Cancelar</button></div>`;
+  if (c.ocupado !== undefined) box.querySelector('[data-c="ocupado"]').value = deBool(c.ocupado);
+  if (c.aceita_financiamento !== undefined) box.querySelector('[data-c="aceita_financiamento"]').value = c.aceita_financiamento === false ? "nao" : "";
+  if (outro) box.querySelector('[data-c="bairro"]').value = "__outro";
+  const selB = box.querySelector('[data-c="bairro"]');
+  selB.onchange = () => { box.querySelector("[data-outro]").hidden = selB.value !== "__outro"; };
+  box.querySelector("[data-cancelar]").onclick = () => { box.hidden = true; };
+  box.querySelector("[data-salvar]").onclick = () => {
+    const g = k => box.querySelector(`[data-c="${k}"]`).value;
+    const bairro = g("bairro") === "__outro" ? g("bairro_outro").trim() : g("bairro");
+    const novo = { id: c.id || "c" + Date.now().toString(36), titulo: g("titulo").trim(), bairro, origem: g("origem"),
+      preco: numBR(g("preco")), area: numBR(g("area")), quartos: numBR(g("quartos")),
+      condominio: numBR(g("condominio")), iptu: numBR(g("iptu")), debitos: numBR(g("debitos")),
+      reforma_m2: numBR(g("reforma_m2")), venda_m2: numBR(g("venda_m2")),
+      ocupado: triBool(g("ocupado")), aceita_financiamento: g("aceita_financiamento") === "nao" ? false : null,
+      endereco: g("endereco").trim(), url: g("url").trim() };
+    const erro = !novo.preco || novo.preco < 10000 ? "Informe o preço (ex.: 360.000)."
+      : !novo.area || novo.area < 10 ? "Informe a área útil em m²."
+      : !bairro ? "Informe o bairro."
+      : !D.bairros[bairro] && !novo.venda_m2 ? "Para um bairro fora da busca, informe o preço de venda do m²."
+      : "";
+    box.querySelector("[data-erro]").textContent = erro;
+    if (erro) return;
+    const lista = lerCad().filter(x => x.id !== novo.id).concat(novo);
+    if (!gravarCad(lista)) { box.querySelector("[data-erro]").textContent = "Este navegador não deixou salvar (modo anônimo?)."; return; }
+    location.hash = "cad=" + novo.id; location.reload();
+  };
+  box.hidden = false;
+  box.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function baixarCsv(){
+  const cols = ["origem","fonte","titulo","bairro","endereco","preco","area","quartos","vagas","condominio","iptu","url","ocupado","aceita_financiamento","debitos","reforma_m2","venda_m2"];
+  const esc = v => v == null ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+  const linhas = lerCad().map(c => cols.map(k => k === "fonte" ? "Manual"
+    : k === "ocupado" ? deBool(c.ocupado) : k === "aceita_financiamento" ? deBool(c.aceita_financiamento)
+    : esc(c[k])).join(","));
+  const blob = new Blob([cols.join(",") + "\n" + linhas.join("\n") + "\n"], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "manual.csv"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+$("#btnCad").onclick = () => abrirCadastro();
+$("#btnCsv").hidden = !lerCad().length;
+$("#btnCsv").onclick = baixarCsv;
+$("#lista").addEventListener("click", e => {
+  const ed = e.target.dataset.editar, ex = e.target.dataset.excluir;
+  if (ed) abrirCadastro(lerCad().find(c => c.id === ed) || {});
+  if (ex && confirm("Excluir este imóvel cadastrado?")) { gravarCad(lerCad().filter(c => c.id !== ex)); location.hash = ""; location.reload(); }
+});
+
 chips(); lista(); desenharGraficos();
+{ const m = location.hash.match(/^#cad=(.+)$/);
+  if (m) { const idx = D.imoveis.findIndex(i => i.id === m[1]); if (idx >= 0) abrir(idx); history.replaceState(null, "", location.pathname); } }
 })();
 </script>
 <script>
