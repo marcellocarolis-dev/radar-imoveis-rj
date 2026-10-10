@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar de Imóveis RJ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="dados.js"></script>
+<script src="operacoes.js"></script>
+<style>
+:root{
+  --bg:#f5f4f0;--card:#ffffff;--ink:#1d1f24;--muted:#6b6f78;--line:#e4e2dc;
+  --accent:#1f5f8b;--verde:#1e8a5a;--amarelo:#c58a12;--vermelho:#c0392b;
+  --verde-bg:#e3f3ea;--amarelo-bg:#fbf0d6;--vermelho-bg:#f8e1de;--chip:#eceae4;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14161a;--card:#1d2026;--ink:#eceef2;--muted:#9aa0aa;--line:#2c3038;
+  --accent:#6aaee0;--verde:#4cc38a;--amarelo:#e5b143;--vermelho:#ef6f61;
+  --verde-bg:#17352a;--amarelo-bg:#3a3020;--vermelho-bg:#3b2220;--chip:#272b32;}}
+:root[data-theme="dark"]{
+  --bg:#14161a;--card:#1d2026;--ink:#eceef2;--muted:#9aa0aa;--line:#2c3038;
+  --accent:#6aaee0;--verde:#4cc38a;--amarelo:#e5b143;--vermelho:#ef6f61;
+  --verde-bg:#17352a;--amarelo-bg:#3a3020;--vermelho-bg:#3b2220;--chip:#272b32;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.45}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:18px}
+h1{font-size:24px;margin:0;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:13px}
+.aviso{background:var(--amarelo-bg);color:var(--ink);border-left:4px solid var(--amarelo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:14px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.kpi .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h2{font-size:15px;margin:0 0 4px}
+.card .nota{color:var(--muted);font-size:12px;margin:0 0 10px}
+.chart{position:relative;height:240px}
+.filtros{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 12px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.linha{display:grid;grid-template-columns:14px 1fr auto;gap:12px;align-items:center;padding:14px 16px;cursor:pointer}
+.dot{width:14px;height:14px;border-radius:50%}
+.dot.verde{background:var(--verde)}.dot.amarelo{background:var(--amarelo)}.dot.vermelho{background:var(--vermelho)}
+.tit{font-weight:600}
+.meta{color:var(--muted);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px}
+.tag{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:5px;background:var(--chip)}
+.tag.leilao{background:var(--accent);color:#fff}
+.marg{text-align:right}
+.marg .v{font-size:20px;font-weight:700}
+.marg .v.verde{color:var(--verde)}.marg .v.amarelo{color:var(--amarelo)}.marg .v.vermelho{color:var(--vermelho)}
+.marg .l{font-size:12px;color:var(--muted)}
+.det{display:none;border-top:1px solid var(--line);padding:16px;background:color-mix(in srgb,var(--card) 92%,var(--bg))}
+.item.aberto .det{display:block}
+.tabela{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}
+.tabela th,.tabela td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.tabela th:first-child,.tabela td:first-child{text-align:left}
+.tabela th{color:var(--muted);font-weight:500;font-size:12px}
+.tabela tr.melhor td{font-weight:700}
+.tabela tr.off td{color:var(--muted);text-decoration:line-through}
+.scroll{overflow-x:auto}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.custos div{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.custos div.t{font-weight:700;border-bottom:none}
+.alertas{margin:0;padding-left:18px;font-size:13px}
+.alertas li{margin-bottom:4px}
+.quit{font-size:13px;margin:0 0 6px;padding:8px 10px;border-radius:8px;background:var(--chip)}
+h3{font-size:13px;margin:14px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+a{color:var(--accent)}
+.vazio{text-align:center;color:var(--muted);padding:40px}
+.tema{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+@media (max-width:760px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .grid2,.cols{grid-template-columns:1fr}
+  .kpi .v{font-size:22px}
+}
+
+/* ---- detalhe do imóvel ---- */
+.veredito{border-radius:12px;padding:16px;margin-bottom:18px;border:1px solid var(--line);border-left:6px solid}
+.veredito.verde{background:var(--verde-bg);border-left-color:var(--verde)}
+.veredito.amarelo{background:var(--amarelo-bg);border-left-color:var(--amarelo)}
+.veredito.vermelho{background:var(--vermelho-bg);border-left-color:var(--vermelho)}
+.vtop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.vlbl{font-size:18px;font-weight:700;letter-spacing:-.01em}
+.vrec{font-size:14px;margin-top:2px}
+.vnum{text-align:right;white-space:nowrap}
+.vnum div{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.veredito.verde .vnum div{color:var(--verde)}.veredito.amarelo .vnum div{color:var(--amarelo)}.veredito.vermelho .vnum div{color:var(--vermelho)}
+.vnum span{font-size:11px;color:var(--muted)}
+.fund{margin:12px 0 0;padding:0;list-style:none;font-size:14px}
+.fund li{padding:5px 0 5px 22px;position:relative;border-top:1px solid color-mix(in srgb,var(--ink) 8%,transparent)}
+.fund li:before{content:"→";position:absolute;left:2px;color:var(--muted)}
+.alertbox{margin-top:10px;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:18px}
+.opcao{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column}
+.opcao.rec{border:2px solid var(--verde);box-shadow:0 2px 10px color-mix(in srgb,var(--verde) 18%,transparent)}
+.opcao.off{opacity:.45}
+.onome{font-weight:700;font-size:14px}
+.otags{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px;min-height:46px;align-content:flex-start}
+.otags em{font-style:normal;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--chip);color:var(--ink)}
+.otags em.t-rec{background:var(--verde);color:#fff}
+.oindisp{font-size:12px;color:var(--vermelho);margin-bottom:4px}
+.olucro{font-size:24px;font-weight:700;letter-spacing:-.02em;margin:6px 0 10px}
+.olucro.neg,dd.neg{color:var(--vermelho)}
+.olucro span{display:block;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0}
+.obarra{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--chip)}
+.obarra .bolso,i.bolso{background:var(--amarelo)}
+.obarra .cred,i.cred{background:var(--accent)}
+.olegenda{display:flex;flex-direction:column;gap:2px;font-size:11.5px;color:var(--muted);margin:6px 0 8px}
+.olegenda i,.legenda i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.opcao dl{margin:auto 0 0;display:grid;grid-template-columns:1fr auto;gap:5px 8px;font-size:12px;border-top:1px solid var(--line);padding-top:8px}
+.opcao dt{color:var(--muted)}.opcao dd{margin:0;text-align:right}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.bloco{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.bloco h3{margin-top:0}
+.barras{display:flex;flex-direction:column;gap:9px;margin:6px 0 12px}
+.br{display:grid;grid-template-columns:130px 1fr 100px;gap:8px;align-items:center;font-size:12.5px}
+.br span{color:var(--muted)}.br b{text-align:right}
+.bt{position:relative;height:14px;background:var(--chip);border-radius:7px}
+.bf{height:100%;border-radius:7px}
+.bf.compra{background:var(--amarelo)}.bf.hoje{background:var(--muted)}.bf.venda{background:var(--verde)}
+.bfx{position:absolute;top:-3px;height:20px;border-radius:9px;background:color-mix(in srgb,var(--verde) 28%,transparent);outline:1px dashed var(--verde)}
+.escala{position:relative;height:96px;margin:6px 8px 4px}
+.trilho{position:absolute;left:0;right:0;top:46px;height:6px;border-radius:3px;background:var(--chip)}
+.faixa{position:absolute;top:44px;height:10px;border-radius:5px;background:color-mix(in srgb,var(--verde) 45%,transparent)}
+.marca{position:absolute;top:38px;width:2px;height:22px;transform:translateX(-1px)}
+.marca span{position:absolute;transform:translateX(-50%);font-size:11px;text-align:center;white-space:nowrap;color:var(--muted);line-height:1.25}
+.marca b{color:var(--ink);font-size:12px}
+.marca.compra{background:var(--amarelo)}.marca.compra span{top:28px}
+.marca.hoje{background:var(--muted)}.marca.hoje span{bottom:28px}
+.marca.esperado{background:var(--verde);width:4px}.marca.esperado span{bottom:28px}
+.tres{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0 8px}
+.tres div{background:var(--chip);border-radius:8px;padding:8px;text-align:center}
+.tres div.dest{background:var(--verde-bg);outline:1.5px solid var(--verde)}
+.tres span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tres b{display:block;font-size:15px}
+.tres small{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap}
+.pilha{display:flex;height:26px;border-radius:7px;overflow:hidden;margin:8px 0 10px}
+.p1{background:#5b6b82}.p2{background:#9a8c6f}.p3{background:#c58a12}.p4{background:#a77bc9}.p5{background:#c0605a}.p6{background:var(--verde)}
+.legenda{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12px;color:var(--muted)}
+.legenda b{color:var(--ink);font-weight:600}
+details.tec{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:var(--card);margin-bottom:10px}
+details.tec summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--accent)}
+details.tec[open] summary{margin-bottom:10px}
+@media (max-width:760px){
+  .cols2{grid-template-columns:1fr}
+  .vtop{flex-direction:column}.vnum{text-align:left}
+  .legenda{grid-template-columns:1fr}
+  .otags{min-height:0}.olucro{margin-top:2px}
+  .tres b{font-size:13px;white-space:nowrap}.tres div{padding:7px 4px}
+  .br{grid-template-columns:1fr 92px}.br .bt{grid-column:1/3;grid-row:2}
+}
+
+/* ---- abas e operações ---- */
+.abas{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 18px}
+.abas button{background:none;border:none;border-bottom:3px solid transparent;padding:10px 14px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+.abas button.on{color:var(--ink);border-bottom-color:var(--accent)}
+[hidden]{display:none!important}
+.op{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:18px}
+.ophead{margin-bottom:10px}
+.tag.st-em_reforma{background:var(--amarelo);color:#fff}.tag.st-comprado{background:var(--accent);color:#fff}
+.tag.st-a_venda{background:#7b6cd9;color:#fff}.tag.st-vendido{background:var(--verde);color:#fff}
+.prazo{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.pt{flex:1;height:8px;background:var(--chip);border-radius:4px;overflow:hidden}.pt div{height:100%;background:var(--accent)}
+.causas{margin:4px 0 0;padding-left:16px}.causas li{padding:2px 0;border:none}.causas li:before{content:none}
+.pos{color:var(--verde)}.neg{color:var(--vermelho)}
+.okpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.okpi{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.okpi span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.okpi .ov{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.okpi small{font-size:11.5px;color:var(--muted)}
+.rl{display:grid;grid-template-columns:1.4fr 1fr 1fr 1.6fr .9fr;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.rl.rh{font-size:11px;color:var(--muted);border-bottom:2px solid var(--line)}
+.rl.rh .rbar{background:none;text-align:center}.rl.rh .rbar span{font-size:10.5px}
+.rl.rt{font-weight:700;border-bottom:none;font-size:14px}
+.rv,.rd{text-align:right;white-space:nowrap}
+.rd{font-weight:600}
+.est{font-style:normal;font-size:10px;padding:1px 5px;border-radius:4px;background:var(--chip);color:var(--muted);margin-left:4px}
+.rbar{position:relative;height:12px}
+.rbar .zero{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
+.rbar .bneg{position:absolute;right:50%;height:100%;background:var(--vermelho);border-radius:3px 0 0 3px}
+.rbar .bpos{position:absolute;left:50%;height:100%;background:var(--verde);border-radius:0 3px 3px 0}
+.rfbar{position:relative;display:flex;height:22px;background:var(--chip);border-radius:6px;margin:30px 0 8px}
+.rfg,i.rfg{background:var(--amarelo)}
+.rff,i.rff{background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--amarelo) 55%,transparent) 0 6px,color-mix(in srgb,var(--amarelo) 25%,transparent) 6px 12px)}
+.rfbar .rfg{border-radius:6px 0 0 6px}
+.rfo{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink)}
+.rfo span{position:absolute;bottom:100%;transform:translateX(-50%);font-size:11px;white-space:nowrap;color:var(--ink);font-weight:600;padding-bottom:2px}
+.rfleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
+.rfleg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.rfleg b{color:var(--ink)}
+.rfres{font-size:13px;font-weight:600;margin:8px 0}
+.cats div{display:grid;grid-template-columns:100px 1fr 90px;gap:8px;align-items:center;font-size:12.5px;padding:2px 0}
+.cats span{color:var(--muted)}.cats b{text-align:right}
+.cb{height:8px;background:var(--chip);border-radius:4px;overflow:hidden}.cb div{height:100%;background:var(--amarelo)}
+.lanc{margin-top:8px;font-size:12.5px}.lanc summary{cursor:pointer;color:var(--accent);font-weight:600}
+.lanc div{display:grid;grid-template-columns:80px 1fr auto;gap:8px;padding:4px 0;border-bottom:1px dashed var(--line)}
+.lanc div span:first-child{color:var(--muted)}
+.ctab div{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line)}
+.ctab div span:not(:first-child),.ctab div b{text-align:right}
+.ctab .ch{font-size:11px;color:var(--muted);border-bottom-width:2px}
+@media (max-width:760px){
+  .okpis{grid-template-columns:1fr 1fr}
+  .rl{grid-template-columns:1fr auto auto;row-gap:2px}
+  .rl .rbar{grid-column:1/3}.rl .rd{grid-column:3}
+  .rl.rh .rbar span{display:none}
+  .cats div{grid-template-columns:80px 1fr 80px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Radar de Imóveis RJ</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <button class="tema" id="tema">alternar tema</button>
+  </header>
+  <nav class="abas"><button data-aba="oport" class="on">Oportunidades</button><button data-aba="ops" id="tabOps">Minhas operações</button></nav>
+  <div id="abaOport">
+  <div id="aviso"></div>
+  <section class="kpis" id="kpis"></section>
+  <section class="grid2">
+    <div class="card">
+      <h2>Preço de referência por bairro</h2>
+      <p class="nota">Mediana do R$/m² dos anúncios de venda (barra) e faixa entre 25% e 75% dos anúncios.</p>
+      <div class="chart"><canvas id="gBairros"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Desconto × margem</h2>
+      <p class="nota">Cada ponto é um imóvel. Quanto mais à esquerda e para cima, melhor o negócio.</p>
+      <div class="chart"><canvas id="gDispersao"></canvas></div>
+    </div>
+  </section>
+  <div class="filtros" id="filtros"></div>
+  <section id="lista"></section>
+  <p class="sub" style="margin-top:24px">Estimativas para triagem. Antes de qualquer lance ou proposta: visite o imóvel, leia edital e matrícula, confirme dívidas e consulte um profissional.</p>
+  </div>
+  <div id="abaOps" hidden></div>
+</div>
+<script>
+(function(){
+const D = window.DADOS;
+const $ = s => document.querySelector(s);
+const brl = v => v == null ? "—" : "R$ " + Math.round(v).toLocaleString("pt-BR");
+const pct = (v, d=1) => v == null ? "—" : (v*100).toLocaleString("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d}) + "%";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// tema manual
+$("#tema").onclick = () => {
+  const r = document.documentElement, escuro = matchMedia("(prefers-color-scheme: dark)").matches;
+  const atual = r.dataset.theme || (escuro ? "dark" : "light");
+  r.dataset.theme = atual === "dark" ? "light" : "dark";
+  try { localStorage.setItem("tema", r.dataset.theme); } catch(e) {}
+  desenharGraficos();
+};
+try { const t = localStorage.getItem("tema"); if (t) document.documentElement.dataset.theme = t; } catch(e) {}
+
+if (!D) { $("#lista").innerHTML = '<div class="vazio">Sem dados. Rode <b>python analisar.py</b> para gerar docs/dados.js.</div>'; return; }
+
+const baseNome = D.imoveis[0]?.analise.base === "roi_capital" ? "retorno s/ capital próprio" : "margem líquida";
+$("#sub").textContent = `Copacabana · Leme · Botafogo — atualizado em ${D.gerado_em} — meta: ${baseNome} ≥ ${pct(D.meta.margem_minima,0)}`;
+if (D.modo === "exemplo") $("#aviso").innerHTML = '<div class="aviso"><b>Dados de exemplo (fictícios).</b> Configure a chave da Apify e os actors para ver imóveis reais.</div>';
+
+const melhor = D.imoveis.length ? D.imoveis[0].analise.margem_melhor : null;
+$("#kpis").innerHTML = [
+  [D.total_coletado, "imóveis coletados"],
+  [D.imoveis.length, "analisados"],
+  [D.contagem.verde, "na meta (verde)"],
+  [pct(melhor), "melhor " + (baseNome.startsWith("margem") ? "margem" : "retorno")],
+].map(([v,l]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+// ---------- gráficos ----------
+let g1, g2;
+function desenharGraficos(){
+  [g1,g2].forEach(g => g && g.destroy());
+  const ink = css("--muted"), line = css("--line");
+  Chart.defaults.color = ink; Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+  const nomes = Object.keys(D.bairros), b = D.bairros;
+  g1 = new Chart($("#gBairros"), {
+    type: "bar",
+    data: { labels: nomes, datasets: [
+      { label: "Mediana R$/m²", data: nomes.map(n => b[n].ref_m2), backgroundColor: css("--accent"), borderRadius: 6, order: 2 },
+      { label: "Faixa 25–75%", type: "bar", data: nomes.map(n => b[n].p25 ? [b[n].p25, b[n].p75] : null),
+        backgroundColor: "transparent", borderColor: ink, borderWidth: 1.5, borderSkipped: false, barPercentage: .25, order: 1, grouped: false },
+    ]},
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: c => c.datasetIndex === 0 ? `${brl(c.raw)}/m² (${b[c.label].amostras} anúncios)` : (c.raw ? `faixa ${brl(c.raw[0])} – ${brl(c.raw[1])}` : "") } } },
+      scales: { y: { beginAtZero: false, grid: { color: line }, ticks: { callback: v => "R$ " + (v/1000).toLocaleString("pt-BR",{maximumFractionDigits:1}) + "k" } }, x: { grid: { display: false } } } }
+  });
+  const cor = { verde: css("--verde"), amarelo: css("--amarelo"), vermelho: css("--vermelho") };
+  g2 = new Chart($("#gDispersao"), {
+    type: "scatter",
+    data: { datasets: ["verde","amarelo","vermelho"].map(s => ({
+      label: s, backgroundColor: cor[s], pointRadius: 5, pointHoverRadius: 7,
+      data: D.imoveis.filter(i => i.analise.semaforo === s).map(i => ({ x: i.desconto_mercado*100, y: i.analise.margem_melhor*100, im: i }))
+    }))},
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: c => `${c.raw.im.bairro} · ${brl(c.raw.im.preco)} · desc ${pct(c.raw.im.desconto_mercado,0)} · ${pct(c.raw.im.analise.margem_melhor)}` } } },
+      onClick: (e, els) => { if (els.length) { const im = D.imoveis.indexOf(g2.data.datasets[els[0].datasetIndex].data[els[0].index].im); abrir(im); } },
+      scales: { x: { title: { display: true, text: "desconto vs mercado (%)" }, grid: { color: line } },
+                y: { title: { display: true, text: baseNome + " (%)" }, grid: { color: line } } } }
+  });
+}
+
+// ---------- filtros ----------
+const F = { bairro: "todos", origem: "todas", sem: "todos" };
+function chips(){
+  const grupo = (chave, opcoes) => opcoes.map(([v,l]) => `<button class="chip ${F[chave]===v?"on":""}" data-k="${chave}" data-v="${v}">${l}</button>`).join("");
+  $("#filtros").innerHTML =
+    grupo("bairro", [["todos","Todos"], ...Object.keys(D.bairros).map(b => [b,b])]) + '<span class="sep"></span>' +
+    grupo("origem", [["todas","Leilão + venda"],["leilao","Leilão"],["venda","Venda"]]) + '<span class="sep"></span>' +
+    grupo("sem", [["todos","Todos"],["verde","Só verdes"],["amarelo","Verdes + amarelos"]]);
+  document.querySelectorAll(".chip").forEach(c => c.onclick = () => { F[c.dataset.k] = c.dataset.v; chips(); lista(); });
+}
+
+// ---------- lista ----------
+function detalhe(i){
+  const a = i.analise, c = a.custos, cen = a.cenarios;
+  const ops = a.modalidades;
+  const disp = ops.filter(m => !m.indisponivel);
+  const rec = ops.find(m => m.nome === a.melhor);
+  const avista = ops.find(m => m.tipo === "avista");
+  const curto = n => n.replace("Carta contemplada", "Consórcio").replace(" (capital próprio)", "");
+
+  // vencedores por critério
+  const maior = (arr, f) => arr.reduce((x, y) => (f(y) > f(x) ? y : x));
+  const wLucro = maior(disp, m => m.lucro).nome;
+  const wBolso = maior(disp, m => -m.capital_proprio).nome;
+  const wRoi = maior(disp, m => m.roi_capital || -9).nome;
+
+  // ---------- 1. veredito ----------
+  const pess = cen.pessimista.resultado[rec.nome], otim = cen.otimista.resultado[rec.nome];
+  const meta = D.meta.margem_minima, base = a.base;
+  const fund = [];
+  if (rec.tipo !== "avista")
+    fund.push(`Você coloca <b>${brl(rec.capital_proprio)}</b> do seu bolso, <b>${brl(avista.capital_proprio - rec.capital_proprio)} a menos</b> que comprando à vista.`);
+  else
+    fund.push(`Você coloca <b>${brl(rec.capital_proprio)}</b> do seu bolso e não paga nada de juros ou ágio.`);
+  fund.push(`Lucro esperado de <b>${brl(rec.lucro)}</b>: <b>${pct(rec.roi_capital)}</b> sobre o seu dinheiro e ${pct(rec.margem)} sobre o custo total.`);
+  if (rec.tipo !== "avista")
+    fund.push(`O crédito custa <b>${brl(rec.custo_financeiro)}</b> até a venda${rec.cet_aa != null ? ` (equivale a ${pct(rec.cet_aa)} ao ano)` : ""}.`);
+  fund.push(pess.lucro > 0
+    ? `Se o mercado pagar menos (cenário pessimista), o lucro ainda fica em <b>${brl(pess.lucro)}</b>.`
+    : `<b>Atenção:</b> no cenário pessimista há prejuízo de ${brl(-pess.lucro)}.`);
+  fund.push(a.prazo_max_na_meta
+    ? `Continua na meta mesmo se a venda demorar até <b>${a.prazo_max_na_meta} meses</b>.`
+    : `Não atinge a meta em nenhum prazo testado.`);
+  if (a.preco_maximo)
+    fund.push(`Para bater a meta de ${pct(meta,0)}, pague no máximo <b>${brl(a.preco_maximo)}</b>${a.preco_maximo < i.preco ? ` (hoje está ${brl(i.preco - a.preco_maximo)} acima)` : ` (margem de segurança de ${brl(a.preco_maximo - i.preco)})`}.`);
+
+  const alt = ops.find(m => m.nome === wRoi);
+  if (alt && alt.nome !== rec.nome && !alt.indisponivel)
+    fund.push(`<b>Alternativa com menos dinheiro do bolso:</b> ${curto(alt.nome)}. Você coloca ${brl(alt.capital_proprio)}, lucra ${brl(alt.lucro)} (${pct(alt.roi_capital)} sobre o seu dinheiro), com margem de ${pct(alt.margem)}${alt.margem >= meta ? ", ainda dentro da meta" : ", abaixo da meta"}. Sobra ${brl(rec.capital_proprio - alt.capital_proprio)} livre para outro imóvel.`);
+  const titulo = a.semaforo === "verde" ? "Vale a pena olhar com carinho"
+               : a.semaforo === "amarelo" ? "Perto da meta — só com negociação"
+               : "Não fecha a conta no preço atual";
+  const veredito = `
+    <div class="veredito ${a.semaforo}">
+      <div class="vtop">
+        <div><div class="vlbl">${titulo}</div><div class="vrec">Melhor forma de pagar: <b>${rec.nome}</b></div></div>
+        <div class="vnum"><div>${pct(a.margem_melhor)}</div><span>${base === "roi_capital" ? "retorno s/ seu dinheiro" : "margem líquida"} · meta ${pct(meta,0)}</span></div>
+      </div>
+      <ul class="fund">${fund.map(f => `<li>${f}</li>`).join("")}</ul>
+      ${i.alertas.length ? `<div class="alertbox">${i.alertas.map(x => `<span>⚠ ${x}</span>`).join("")}</div>` : ""}
+    </div>`;
+
+  // ---------- 2. preço de venda após reforma ----------
+  const vP = cen.pessimista.venda, vE = cen.esperado.venda, vO = cen.otimista.venda;
+  const custoTotal = c.preco + c.itbi + c.cartorio + c.leiloeiro + c.desocupacao + c.debitos + c.reforma + c.manutencao;
+  const vendaBox = `
+    <div class="bloco">
+      <h3>Preço de venda após a reforma</h3>
+      <div class="barras">
+        <div class="br"><span>Compra</span><div class="bt"><div class="bf compra" style="width:${(i.preco/vO*100).toFixed(1)}%"></div></div><b>${brl(i.preco)}</b></div>
+        <div class="br"><span>Vale hoje (sem reforma)</span><div class="bt"><div class="bf hoje" style="width:${(cen.valor_atual_mercado/vO*100).toFixed(1)}%"></div></div><b>${brl(cen.valor_atual_mercado)}</b></div>
+        <div class="br"><span>Após a reforma</span><div class="bt"><div class="bf venda" style="width:${(vE/vO*100).toFixed(1)}%"></div><div class="bfx" style="left:${(vP/vO*100).toFixed(1)}%;width:${((vO-vP)/vO*100).toFixed(1)}%"></div></div><b>${brl(vE)}</b></div>
+      </div>
+      <div class="tres">
+        <div><span>Pessimista</span><b>${brl(vP)}</b><small>${brl(cen.pessimista.venda_m2)}/m²</small><small>lucro ${brl(pess.lucro)}</small></div>
+        <div class="dest"><span>Esperado</span><b>${brl(vE)}</b><small>${brl(cen.esperado.venda_m2)}/m²</small><small>lucro ${brl(rec.lucro)}</small></div>
+        <div><span>Otimista</span><b>${brl(vO)}</b><small>${brl(cen.otimista.venda_m2)}/m²</small><small>lucro ${brl(otim.lucro)}</small></div>
+      </div>
+      <p class="sub">Como calculamos: R$/m² do bairro (${brl(cen.ref_m2)}) × ${Math.round(i.area)} m², menos ${pct(cen.desconto_negociacao,0)} de negociação, mais ${pct(cen.premio_reformado,0)} por estar reformado. A faixa clara na última barra vai do cenário pessimista ao otimista (25% mais baratos e 25% mais caros dos anúncios do bairro).</p>
+    </div>`;
+
+  // ---------- para onde vai o dinheiro da venda ----------
+  const partes = [
+    ["Compra", c.preco, "p1"], ["Impostos e taxas", c.itbi + c.cartorio + c.leiloeiro + c.desocupacao + c.debitos, "p2"],
+    ["Reforma", c.reforma, "p3"], ["Condomínio e IPTU", c.manutencao, "p4"],
+    ["Corretagem e IR", c.corretagem + c.ir, "p5"],
+  ];
+  const lucroAv = c.venda_bruta - partes.reduce((s, p) => s + p[1], 0);
+  if (lucroAv > 0) partes.push(["Lucro (à vista)", lucroAv, "p6"]);
+  const totBar = Math.max(c.venda_bruta, partes.reduce((s, p) => s + p[1], 0));
+  const destino = `
+    <div class="bloco">
+      <h3>Para onde vai o dinheiro da venda (${brl(c.venda_bruta)})</h3>
+      <div class="pilha">${partes.filter(p => p[1] > 0).map(p => `<div class="${p[2]}" style="width:${(p[1] / totBar * 100).toFixed(2)}%" title="${p[0]}: ${brl(p[1])}"></div>`).join("")}</div>
+      <div class="legenda">${partes.filter(p => p[1] > 0).map(p => `<span><i class="${p[2]}"></i>${p[0]} <b>${brl(p[1])}</b></span>`).join("")}</div>
+      ${lucroAv <= 0 ? `<p class="sub"><b>A venda não cobre os custos:</b> faltam ${brl(-lucroAv)}.</p>` : ""}
+    </div>`;
+
+  // ---------- 3. cartões das opções ----------
+  const maxBarra = Math.max(...ops.map(m => m.capital_proprio + m.credito));
+  const cards = ops.map(m => {
+    const tags = [];
+    if (m.nome === a.melhor) tags.push('<em class="t-rec">Recomendada</em>');
+    if (!m.indisponivel) {
+      if (m.nome === wLucro) tags.push("<em>Mais lucro</em>");
+      if (m.nome === wBolso) tags.push("<em>Menos do bolso</em>");
+      if (m.nome === wRoi) tags.push("<em>Maior retorno</em>");
+    }
+    const p = cen.pessimista.resultado[m.nome];
+    return `
+      <div class="opcao ${m.nome === a.melhor ? "rec" : ""} ${m.indisponivel ? "off" : ""}">
+        <div class="onome">${curto(m.nome)}</div>
+        <div class="otags">${tags.join("")}</div>
+        ${m.indisponivel ? `<div class="oindisp">${m.indisponivel}</div>` : ""}
+        <div class="olucro ${m.lucro >= 0 ? "" : "neg"}">${brl(m.lucro)}<span>lucro esperado</span></div>
+        <div class="obarra">
+          <div class="bolso" style="width:${(m.capital_proprio / maxBarra * 100).toFixed(1)}%"></div>
+          <div class="cred" style="width:${(m.credito / maxBarra * 100).toFixed(1)}%"></div>
+        </div>
+        <div class="olegenda"><span><i class="bolso"></i>Seu bolso ${brl(m.capital_proprio)}</span>${m.credito ? `<span><i class="cred"></i>${m.tipo === "consorcio" ? "Carta" : "Banco"} ${brl(m.credito)}</span>` : ""}</div>
+        <dl>
+          <dt>Retorno s/ seu dinheiro</dt><dd><b>${pct(m.roi_capital)}</b></dd>
+          <dt>Margem</dt><dd>${pct(m.margem)}</dd>
+          <dt>Custo do crédito</dt><dd>${m.custo_financeiro ? brl(m.custo_financeiro) : "—"}</dd>
+          <dt>Lucro pessimista</dt><dd class="${p.lucro < 0 ? "neg" : ""}">${brl(p.lucro)}</dd>
+        </dl>
+      </div>`;
+  }).join("");
+
+  // ---------- 4. detalhes técnicos (recolhidos) ----------
+  const linhas = ops.map(m => `
+    <tr class="${m.nome===a.melhor?"melhor":""} ${m.indisponivel?"off":""}">
+      <td>${m.nome}</td><td>${brl(m.lucro)}</td><td>${pct(m.margem)}</td><td>${brl(m.capital_proprio)}</td>
+      <td>${pct(m.roi_capital)}</td><td>${brl(m.custo_financeiro)}</td><td>${m.cet_aa!=null?pct(m.cet_aa):"—"}</td><td>${pct(m.tir_aa)}</td>
+    </tr>`).join("");
+  const itens = [["Compra",c.preco],["ITBI",c.itbi],["Escritura e registro",c.cartorio],["Comissão leiloeiro",c.leiloeiro],
+    ["Desocupação",c.desocupacao],["Débitos",c.debitos],["Reforma",c.reforma],[`Condomínio + IPTU (${a.prazo_meses} meses)`,c.manutencao]]
+    .filter(x => x[1] > 0).map(([l,v]) => `<div><span>${l}</span><span>${brl(v)}</span></div>`).join("");
+  const quit = disp.filter(m => m.quitacao).map(m => `<p class="quit"><b>${curto(m.nome)}:</b> ${m.quitacao}</p>`).join("");
+  const cons = ops.filter(m => m.tipo==="consorcio").map(m => {
+    const d = m.detalhes;
+    return `<p class="quit"><b>${curto(m.nome)}:</b> carta ${brl(d.valor_carta)}, ágio ${brl(d.agio)}, parcela inicial ${brl(d.parcela_inicial)}.
+      Na venda restam ${d.parcelas_restantes_na_venda} parcelas → quitação ${brl(d.saldo_quitacao)}.
+      ${d.capital_proprio_complementar>0?`Complemento com capital próprio: ${brl(d.capital_proprio_complementar)}.`:""} ${d.aviso?`<b>⚠ ${d.aviso}</b>`:""}</p>`;
+  }).join("");
+  const fin = ops.filter(m => m.tipo==="financiamento").map(m => {
+    const d = m.detalhes;
+    return `<p class="quit"><b>${m.nome}:</b> entrada ${brl(d.entrada)}, financiado ${brl(d.valor_financiado)}, 1ª parcela ${brl(d.primeira_parcela)};
+      juros pagos até a venda ${brl(d.juros_pagos)}; quitação na venda ${brl(d.saldo_quitacao)}.</p>`;
+  }).join("");
+
+  return `
+    ${veredito}
+    <h3>Compare as formas de pagar</h3>
+    <div class="opcoes">${cards}</div>
+    <div class="cols2">${vendaBox}${destino}</div>
+    <details class="tec" data-id="${i.id}">
+      <summary>Detalhes técnicos — tabela completa, custos, prazo de venda e quando quitar</summary>
+      <div class="scroll"><table class="tabela">
+        <tr><th>Modalidade</th><th>Lucro</th><th>Margem</th><th>Capital próprio</th><th>Retorno s/ capital</th><th>Custo financeiro</th><th>Custo efetivo a.a.</th><th>TIR a.a.</th></tr>
+        ${linhas}</table></div>
+      <div class="cols">
+        <div><h3>Custos da operação</h3><div class="custos">${itens}<div class="t"><span>Total (sem crédito)</span><span>${brl(custoTotal)}</span></div></div></div>
+        <div><h3>${baseNome} conforme o tempo até vender</h3>
+          <div class="chart" style="height:230px"><canvas id="s${i.id}"></canvas></div></div>
+      </div>
+      <h3>Quando quitar ou antecipar</h3>${quit}${fin}${cons}
+    </details>
+    ${i.url?`<p><a href="${i.url}" target="_blank" rel="noopener">Abrir anúncio / edital ↗</a></p>`:""}`;
+}
+
+function sensGrafico(i){
+  const a = i.analise, el = document.getElementById("s" + i.id);
+  if (!el || el.dataset.ok) return;
+  el.dataset.ok = 1;
+  const pal = [css("--ink"), css("--accent"), "#7b6cd9", css("--verde"), css("--amarelo"), "#d9608c"];
+  const nomes = a.modalidades.filter(m => !m.indisponivel).map(m => m.nome);
+  new Chart(el, { type: "line",
+    data: { labels: a.sensibilidade.map(s => s.meses + " meses"),
+      datasets: nomes.map((n,k) => ({ label: n, data: a.sensibilidade.map(s => s.margens[n]*100), borderColor: pal[k%pal.length],
+        backgroundColor: pal[k%pal.length], borderWidth: n===a.melhor?3:1.5, pointRadius: 2, tension: .2 })) },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: true, position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } },
+      tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.toFixed(1)}%` } } },
+      scales: { y: { grid: { color: css("--line") }, ticks: { callback: v => v + "%" } }, x: { grid: { display: false } } } }
+  });
+}
+
+function filtrados(){
+  return D.imoveis.filter(i =>
+    (F.bairro==="todos" || i.bairro===F.bairro) &&
+    (F.origem==="todas" || i.origem===F.origem) &&
+    (F.sem==="todos" || (F.sem==="verde" ? i.analise.semaforo==="verde" : i.analise.semaforo!=="vermelho")));
+}
+
+function lista(){
+  const L = filtrados();
+  if (!L.length) { $("#lista").innerHTML = '<div class="vazio">Nenhum imóvel com esses filtros.</div>'; return; }
+  $("#lista").innerHTML = L.map(i => {
+    const a = i.analise, ref = D.bairros[i.bairro].ref_m2;
+    return `<div class="item" id="im${D.imoveis.indexOf(i)}">
+      <div class="linha">
+        <span class="dot ${a.semaforo}"></span>
+        <div>
+          <div class="tit">${i.titulo}</div>
+          <div class="meta"><span class="tag ${i.origem}">${i.origem==="leilao"?"Leilão":"Venda"}</span>
+            <span>${i.bairro}</span><span>${brl(i.preco)}</span><span>${Math.round(i.area)} m²</span>
+            <span>${brl(i.preco_m2)}/m² (${pct(i.desconto_mercado,0)} vs ${brl(ref)})</span>
+            ${i.data_leilao?`<span>leilão ${i.data_leilao}</span>`:""}</div>
+        </div>
+        <div class="marg"><div class="v ${a.semaforo}">${pct(a.margem_melhor)}</div><div class="l">${a.melhor}</div></div>
+      </div>
+      <div class="det"></div>
+    </div>`;
+  }).join("");
+  document.querySelectorAll(".item").forEach(el => el.querySelector(".linha").onclick = () => alternar(el));
+}
+
+function alternar(el){
+  const i = D.imoveis[+el.id.slice(2)], det = el.querySelector(".det");
+  if (!det.innerHTML) {
+    det.innerHTML = detalhe(i);
+    det.querySelector("details.tec").addEventListener("toggle", e => { if (e.target.open) sensGrafico(i); });
+  }
+  el.classList.toggle("aberto");
+}
+function abrir(idx){
+  F.bairro = "todos"; F.origem = "todas"; F.sem = "todos"; chips(); lista();
+  const el = document.getElementById("im" + idx); if (!el) return;
+  if (!el.classList.contains("aberto")) alternar(el);
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+chips(); lista(); desenharGraficos();
+})();
+</script>
+<script>
+(function(){
+const O = window.OPERACOES;
+const $ = s => document.querySelector(s);
+const brl = v => v == null ? "—" : (v < 0 ? "−" : "") + "R$ " + Math.abs(Math.round(v)).toLocaleString("pt-BR");
+const sinal = v => (v > 0 ? "+" : v < 0 ? "−" : "") + "R$ " + Math.abs(Math.round(v)).toLocaleString("pt-BR");
+const pct = (v, d=1) => v == null ? "—" : (v*100).toLocaleString("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d}) + "%";
+const pp = v => (v >= 0 ? "+" : "−") + Math.abs(v*100).toLocaleString("pt-BR",{maximumFractionDigits:1}) + " p.p.";
+const dataBR = s => s ? s.split("-").reverse().join("/") : "";
+const STATUS = { comprado: "Comprado", em_reforma: "Em reforma", a_venda: "À venda", vendido: "Vendido" };
+
+// ---------- abas ----------
+const n = O ? O.operacoes.length : 0;
+$("#tabOps").textContent = `Minhas operações${n ? ` (${n})` : ""}`;
+function aba(qual){
+  document.querySelectorAll(".abas button").forEach(b => b.classList.toggle("on", b.dataset.aba === qual));
+  $("#abaOport").hidden = qual !== "oport"; $("#abaOps").hidden = qual !== "ops";
+  try { history.replaceState(null, "", qual === "ops" ? "#operacoes" : "#"); } catch(e) {}
+}
+document.querySelectorAll(".abas button").forEach(b => b.onclick = () => aba(b.dataset.aba));
+if (location.hash === "#operacoes") aba("ops");
+
+if (!O || !n) {
+  $("#abaOps").innerHTML = `<div class="vazio">Nenhuma operação cadastrada ainda.<br>Cadastre em <b>operacoes.yaml</b> e rode <b>python acompanhar.py</b>.</div>`;
+  return;
+}
+
+const meta = O.meta.margem_minima, alerta = O.meta.margem_alerta;
+const cor = m => m >= meta ? "verde" : m >= alerta ? "amarelo" : "vermelho";
+
+function card(o){
+  const P = o.projetado, R = o.real, dl = R.lucro - P.lucro;
+  const piores = o.linhas.filter(l => l.efeito_lucro < -500).sort((a,b) => a.efeito_lucro - b.efeito_lucro).slice(0,3);
+  const melhores = o.linhas.filter(l => l.efeito_lucro > 500).sort((a,b) => b.efeito_lucro - a.efeito_lucro).slice(0,2);
+  const causa = l => `<li><b>${l.rotulo}</b>: ${l.custo ? (l.diferenca > 0 ? "custou " : "economizou ") + brl(Math.abs(l.diferenca)) + (l.diferenca > 0 ? " a mais" : "") : (l.diferenca > 0 ? "vendeu " + brl(l.diferenca) + " acima" : "vendeu " + brl(-l.diferenca) + " abaixo")}${l.informado ? "" : " <small>(estimado)</small>"} <span class="${l.efeito_lucro < 0 ? "neg" : "pos"}">${sinal(l.efeito_lucro)} no lucro</span></li>`;
+
+  const titulo = Math.abs(dl) < 0.02 * Math.abs(P.lucro || 1) ? "Dentro do projetado"
+    : dl < 0 ? "Abaixo do projetado" : "Acima do projetado";
+  const situ = R.margem >= meta ? "continua na meta" : R.margem >= alerta ? "saiu da meta, mas ainda dá lucro razoável" : "ficou bem abaixo da meta";
+
+  const kpi = (rot, p, r, fmt, maiorMelhor = true) => {
+    const bom = maiorMelhor ? r >= p : r <= p;
+    return `<div class="okpi"><span>${rot}</span><div class="ov">${fmt(r)}</div>
+      <small>projetado ${fmt(p)} ${Math.abs(r - p) < 1e-6 ? "" : `<b class="${bom ? "pos" : "neg"}">${r > p ? "▲" : "▼"}</b>`}</small></div>`;
+  };
+
+  // linhas real x projetado com barra divergente do efeito no lucro
+  const maxEf = Math.max(1, ...o.linhas.map(l => Math.abs(l.efeito_lucro)));
+  const linhas = o.linhas.filter(l => l.projetado || l.real).map(l => {
+    const w = (Math.abs(l.efeito_lucro) / maxEf * 50).toFixed(1);
+    return `<div class="rl">
+      <div class="rr">${l.rotulo}${l.informado ? "" : ' <em class="est">estimado</em>'}</div>
+      <div class="rv">${brl(l.projetado)}</div><div class="rv"><b>${brl(l.real)}</b></div>
+      <div class="rbar"><div class="zero"></div>${Math.abs(l.efeito_lucro) >= 1 ? `<div class="${l.efeito_lucro < 0 ? "bneg" : "bpos"}" style="width:${w}%"></div>` : ""}</div>
+      <div class="rd ${l.efeito_lucro < -0.5 ? "neg" : l.efeito_lucro > 0.5 ? "pos" : ""}">${Math.abs(l.efeito_lucro) < 1 ? "—" : sinal(l.efeito_lucro)}</div>
+    </div>`;
+  }).join("");
+
+  // reforma
+  const rf = o.reforma, prev = rf.gasto + rf.a_gastar, escala = Math.max(prev, rf.orcado) * 1.05;
+  const cats = Object.entries(rf.categorias).sort((a,b) => b[1]-a[1]);
+  const maxCat = Math.max(1, ...cats.map(c => c[1]));
+  const reforma = `
+    <div class="bloco">
+      <h3>Reforma: gasto × orçamento</h3>
+      <div class="rfbar">
+        <div class="rfg" style="width:${(rf.gasto/escala*100).toFixed(1)}%"></div>
+        <div class="rff" style="width:${(rf.a_gastar/escala*100).toFixed(1)}%"></div>
+        <div class="rfo" style="left:${(rf.orcado/escala*100).toFixed(1)}%"><span>orçado ${brl(rf.orcado)}</span></div>
+      </div>
+      <div class="rfleg"><span><i class="rfg"></i>Já gasto <b>${brl(rf.gasto)}</b></span><span><i class="rff"></i>Falta gastar <b>${brl(rf.a_gastar)}</b></span></div>
+      <p class="rfres ${prev > rf.orcado ? "neg" : "pos"}">Previsão final ${brl(prev)}: ${prev > rf.orcado ? `${pct(prev/rf.orcado-1,0)} acima do orçado` : `${pct(1-prev/rf.orcado,0)} abaixo do orçado`}. Já foi gasto ${pct(rf.gasto/rf.orcado,0)} do orçamento.</p>
+      ${cats.length ? `<div class="cats">${cats.map(([c,v]) => `<div><span>${c}</span><div class="cb"><div style="width:${(v/maxCat*100).toFixed(1)}%"></div></div><b>${brl(v)}</b></div>`).join("")}</div>` : ""}
+      ${rf.lancamentos.length ? `<details class="lanc"><summary>${rf.lancamentos.length} lançamentos</summary>
+        ${rf.lancamentos.map(l => `<div><span>${dataBR(l.data)}</span><span>${l.categoria || ""} — ${l.descricao || ""}</span><b>${brl(l.valor)}</b></div>`).join("")}</details>` : ""}
+    </div>`;
+
+  // crédito
+  const cp = o.credito.projetado, cr = o.credito.real;
+  const lin = (rot, a, b, menor = true) => (a == null && b == null) ? "" :
+    `<div><span>${rot}</span><span>${brl(a)}</span><b class="${b == null || a == null || Math.abs(b-a) < 1 ? "" : (menor ? b < a : b > a) ? "pos" : "neg"}">${brl(b)}</b></div>`;
+  let credito = "";
+  if (cp.valor_carta != null) credito = lin("Valor da carta", cp.valor_carta, cr.valor_carta, false) + lin("Ágio pago", cp.agio, cr.agio)
+      + lin("Parcela", cp.parcela_inicial, cr.parcela_inicial) + lin("Saldo a quitar na venda", cp.saldo_quitacao, cr.saldo_quitacao)
+      + (cr.capital_proprio_complementar ? lin("Complemento do bolso", cp.capital_proprio_complementar, cr.capital_proprio_complementar) : "");
+  else if (cp.valor_financiado != null) credito = lin("Entrada", cp.entrada, cr.entrada) + lin("Valor financiado", cp.valor_financiado, cr.valor_financiado, false)
+      + lin("1ª parcela", cp.primeira_parcela, cr.primeira_parcela) + lin("Juros pagos até a venda", cp.juros_pagos, cr.juros_pagos)
+      + lin("Saldo a quitar na venda", cp.saldo_quitacao, cr.saldo_quitacao);
+  const credBox = credito ? `
+    <div class="bloco">
+      <h3>Crédito: ${o.modalidade}</h3>
+      <div class="ctab"><div class="ch"><span></span><span>Projetado</span><span>Real</span></div>${credito}
+        ${o.credito.cet_proj != null ? `<div><span>Custo efetivo ao ano</span><span>${pct(o.credito.cet_proj)}</span><b class="${o.credito.cet_real > o.credito.cet_proj + 0.0005 ? "neg" : o.credito.cet_real < o.credito.cet_proj - 0.0005 ? "pos" : ""}">${pct(o.credito.cet_real)}</b></div>` : ""}
+      </div>
+    </div>` : "";
+
+  const decorrido = o.meses_decorridos, total = R.prazo_meses;
+  const prazo = decorrido != null && o.status !== "vendido" ? `
+    <div class="prazo"><div class="pt"><div style="width:${Math.min(decorrido/total*100,100).toFixed(1)}%"></div></div>
+      <span>Mês ${decorrido} de ${total} previstos${total > P.prazo_meses ? ` (projetado: ${P.prazo_meses})` : ""}</span></div>` : "";
+
+  return `
+  <div class="op">
+    <div class="ophead">
+      <div><div class="tit">${o.nome}</div>
+        <div class="meta"><span class="tag st-${o.status}">${STATUS[o.status] || o.status}</span>
+          ${o.data_compra ? `<span>comprado em ${dataBR(o.data_compra)}</span>` : ""}<span>${o.modalidade}</span>
+          <span>projetado congelado em ${dataBR(o.congelado_em)}</span></div></div>
+    </div>
+    ${prazo}
+    <div class="veredito ${cor(R.margem)}">
+      <div class="vtop">
+        <div><div class="vlbl">${titulo}</div>
+          <div class="vrec">Lucro ${o.vendido ? "realizado" : "previsto hoje"}: <b>${brl(R.lucro)}</b> (projetado ${brl(P.lucro)}, ${sinal(dl)})</div></div>
+        <div class="vnum"><div>${pct(R.margem)}</div><span>margem real · projetada ${pct(P.margem)} · ${pp(R.margem - P.margem)}</span></div>
+      </div>
+      <ul class="fund">
+        <li>Com os números de hoje, a operação <b>${situ}</b> (meta ${pct(meta,0)}).</li>
+        ${piores.length ? `<li>O que mais pesou contra:<ul class="causas">${piores.map(causa).join("")}</ul></li>` : ""}
+        ${melhores.length ? `<li>O que ajudou:<ul class="causas">${melhores.map(causa).join("")}</ul></li>` : ""}
+        ${o.vendido ? "" : `<li>Preço de venda considerado: <b>${o.venda_fonte}</b>. Quando vender, lance o valor real para fechar a conta.</li>`}
+      </ul>
+    </div>
+    <div class="okpis">
+      ${kpi("Lucro", P.lucro, R.lucro, brl)}
+      ${kpi("Margem", P.margem, R.margem, v => pct(v))}
+      ${kpi("Dinheiro do seu bolso", P.capital_proprio, R.capital_proprio, brl, false)}
+      ${kpi("Retorno s/ seu dinheiro", P.roi_capital, R.roi_capital, v => pct(v))}
+    </div>
+    <div class="bloco">
+      <h3>Real × projetado, item por item</h3>
+      <div class="rl rh"><div class="rr"></div><div class="rv">Projetado</div><div class="rv">Real</div><div class="rbar"><span>piorou ◀ efeito no lucro ▶ melhorou</span></div><div class="rd">No lucro</div></div>
+      ${linhas}
+      <div class="rl rt"><div class="rr">Lucro</div><div class="rv">${brl(P.lucro)}</div><div class="rv"><b>${brl(R.lucro)}</b></div><div class="rbar"></div><div class="rd ${dl < 0 ? "neg" : "pos"}">${sinal(dl)}</div></div>
+      <p class="sub">"Estimado" = ainda não informado no real; usa o valor projetado ou a conta do sistema.</p>
+    </div>
+    <div class="cols2">${reforma}${credBox}</div>
+  </div>`;
+}
+
+$("#abaOps").innerHTML = `<p class="sub" style="margin:0 0 12px">Atualizado em ${O.gerado_em}. Os valores reais vêm do arquivo operacoes.yaml.</p>` + O.operacoes.map(card).join("");
+})();
+</script>
+</body>
+</html>
