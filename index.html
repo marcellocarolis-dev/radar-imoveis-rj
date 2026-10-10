@@ -265,7 +265,7 @@ try { const t = localStorage.getItem("tema"); if (t) document.documentElement.da
 if (!D) { $("#lista").innerHTML = '<div class="vazio">Sem dados. Rode <b>python analisar.py</b> para gerar docs/dados.js.</div>'; return; }
 
 const baseNome = D.imoveis[0]?.analise.base === "roi_capital" ? "retorno s/ capital próprio" : "margem líquida";
-$("#sub").textContent = `Copacabana · Leme · Botafogo — atualizado em ${D.gerado_em} — meta: ${baseNome} ≥ ${pct(D.meta.margem_minima,0)}`;
+$("#sub").textContent = `${Object.keys(D.bairros).join(" · ")} — atualizado em ${D.gerado_em} — meta: ${baseNome} ≥ ${pct(D.meta.margem_minima,0)}`;
 if (D.modo === "exemplo") $("#aviso").innerHTML = '<div class="aviso"><b>Dados de exemplo (fictícios).</b> Configure a chave da Apify e os actors para ver imóveis reais.</div>';
 
 const melhor = D.imoveis.length ? D.imoveis[0].analise.margem_melhor : null;
@@ -387,7 +387,7 @@ function detalhe(i){
         <div class="dest"><span>Esperado</span><b>${brl(vE)}</b><small>${brl(cen.esperado.venda_m2)}/m²</small><small>lucro ${brl(rec.lucro)}</small></div>
         <div><span>Otimista</span><b>${brl(vO)}</b><small>${brl(cen.otimista.venda_m2)}/m²</small><small>lucro ${brl(otim.lucro)}</small></div>
       </div>
-      <p class="sub">Como calculamos: R$/m² do bairro (${brl(cen.ref_m2)}) × ${Math.round(i.area)} m², menos ${pct(cen.desconto_negociacao,0)} de negociação, mais ${pct(cen.premio_reformado,0)} por estar reformado. A faixa clara na última barra vai do cenário pessimista ao otimista (25% mais baratos e 25% mais caros dos anúncios do bairro).</p>
+      <p class="sub">Como calculamos: R$/m² de ${i.referencia_usada || "anúncios do bairro"} em ${i.bairro} (${brl(cen.ref_m2)}) × ${Math.round(i.area)} m², menos ${pct(cen.desconto_negociacao,0)} de negociação, mais ${pct(cen.premio_reformado,0)} por estar reformado. A faixa clara na última barra vai do cenário pessimista ao otimista (25% mais baratos e 25% mais caros desses anúncios).</p>
     </div>`;
 
   // ---------- para onde vai o dinheiro da venda ----------
@@ -507,7 +507,7 @@ function lista(){
   const L = filtrados();
   if (!L.length) { $("#lista").innerHTML = '<div class="vazio">Nenhum imóvel com esses filtros.</div>'; return; }
   $("#lista").innerHTML = L.map(i => {
-    const a = i.analise, ref = D.bairros[i.bairro].ref_m2;
+    const a = i.analise, ref = a.cenarios?.ref_m2 ?? D.bairros[i.bairro].ref_m2;
     return `<div class="item" id="im${D.imoveis.indexOf(i)}">
       <div class="linha">
         <span class="dot ${a.semaforo}"></span>
