@@ -252,9 +252,65 @@
     return a;
   }
 
+  // ---------- aluguel.py (reformar e alugar no Airbnb) ----------
+  const DIAS_MES = 365 / 12;
+  const investimentoAluguel = (p, A) => p.preco + p.itbi + p.cartorio + p.leiloeiro + p.desocupacao + p.debitos + p.reforma + A.mobilia;
+
+  function mesAluguel(p, A, diaria, ocupacao) {
+    const receita = diaria * DIAS_MES * ocupacao, taxa = receita * A.taxa_plataforma;
+    const gestao = (receita - taxa) * A.gestao_pct, condIptu = p.condominio_mensal + p.iptu_mensal;
+    const ir = Math.max(receita - taxa - gestao - condIptu, 0) * A.aliquota_ir;
+    return { diaria, ocupacao, noites: DIAS_MES * ocupacao, receita, taxa, gestao, condominio_iptu: condIptu,
+             contas: A.contas_mensais, ir, liquido: receita - taxa - gestao - condIptu - A.contas_mensais - ir };
+  }
+
+  function ocupacaoPara(p, A, diaria, alvo) {
+    if (mesAluguel(p, A, diaria, 1).liquido < alvo) return null;
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 50; k++) { const mid = (lo + hi) / 2; if (mesAluguel(p, A, diaria, mid).liquido >= alvo) hi = mid; else lo = mid; }
+    return hi;
+  }
+
+  function aluguelComCredito(p, inv, liquido, C, aceita) {
+    if (aceita === false) return [];
+    return ofertasDe(C).slice(1).map(of => {
+      let bolso, parcela;
+      if (of.tipo === "financiamento") {
+        const o = financiamento(p.preco, 12, of);
+        bolso = inv - o.credito + (of.tarifa_avaliacao || 0); parcela = o.detalhes.primeira_parcela;
+      } else {
+        const o = consorcio(p.preco, 12, of);
+        bolso = inv - o.credito + o.detalhes.agio + o.detalhes.transferencia; parcela = o.detalhes.parcela_inicial;
+      }
+      const sobra = liquido - parcela;
+      return { nome: of.nome, tipo: of.tipo, bolso, parcela, sobra, retorno_bolso_aa: bolso > 0 ? sobra * 12 / bolso : null };
+    });
+  }
+
+  const semaforoAluguel = (r, A) => r >= A.retorno_minimo_aa ? "verde" : r >= A.retorno_alerta_aa ? "amarelo" : "vermelho";
+
+  /* p = premissas; mercado = D.airbnb.bairros[bairro]; A = D.airbnb.parametros; C = D.simulador */
+  function aluguel(p, mercado, A, C, aceita) {
+    if (!mercado || !mercado.diaria || !mercado.ocupacao_30d) return null;
+    const inv = investimentoAluguel(p, A), aj = A.ocupacao_ajuste ?? 1, cen = {};
+    for (const [nome, k] of [["pessimista", "p25"], ["esperado", "mediana"], ["otimista", "p75"]]) {
+      const m = mesAluguel(p, A, mercado.diaria[k], Math.min(mercado.ocupacao_30d[k] * aj, 1));
+      m.retorno_aa = m.liquido * 12 / inv;
+      cen[nome] = m;
+    }
+    const e = cen.esperado, semRenda = p.meses_desocupacao + p.meses_reforma;
+    return { investimento: inv, mobilia: A.mobilia, meses_sem_renda: semRenda, anuncios: mercado.anuncios ?? null, cenarios: cen,
+      retorno_aa: e.retorno_aa, semaforo: semaforoAluguel(e.retorno_aa, A),
+      anos_para_recuperar: e.liquido > 0 ? inv / (e.liquido * 12) + semRenda / 12 : null,
+      ocupacao_empate: ocupacaoPara(p, A, e.diaria, 0),
+      ocupacao_meta: ocupacaoPara(p, A, e.diaria, A.retorno_minimo_aa * inv / 12),
+      credito: aluguelComCredito(p, inv, e.liquido, C, aceita) };
+  }
+
   /* Análise completa de um imóvel (o mesmo que analisar.py faz para cada coletado).
-     rb = referência {ref_m2, p25, p75, fonte}; C = D.simulador (parâmetros do config.yaml). */
-  function analiseCompleta(im, rb, C) {
+     rb = referência {ref_m2, p25, p75, fonte}; C = D.simulador (parâmetros do config.yaml);
+     AB = D.airbnb (mercado do Airbnb por bairro + custos), opcional. */
+  function analiseCompleta(im, rb, C, AB) {
     const ref = rb.ref_m2;
     im.preco_m2 = im.preco / im.area;
     im.desconto_mercado = im.preco_m2 / ref - 1;
@@ -263,6 +319,7 @@
     im.analise.cenarios = cenarios(im, rb, C);
     im.analise.preco_maximo = precoMaximoMeta(im, ref, C);
     im.analise.premissas = premissasDoImovel(im, ref, C);
+    im.analise.aluguel = AB ? aluguel(im.analise.premissas, AB.bairros[im.bairro], AB.parametros, C, im.aceita_financiamento) : null;
     im.alertas = alertas(im, ref);
     return im;
   }
@@ -299,6 +356,6 @@
     return lo;
   }
 
-  g.SIM = { premissas, resultado, precoMaximo, analiseCompleta, taxaMensal, tir };
+  g.SIM = { premissas, resultado, precoMaximo, analiseCompleta, aluguel, taxaMensal, tir };
   if (typeof module !== "undefined") module.exports = g.SIM;
 })(typeof window !== "undefined" ? window : globalThis);

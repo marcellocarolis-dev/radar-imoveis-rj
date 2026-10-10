@@ -184,6 +184,46 @@ details.tec[open] summary{margin-bottom:10px}
   .br{grid-template-columns:1fr 92px}.br .bt{grid-column:1/3;grid-row:2}
 }
 
+/* ---- Airbnb (reformar e alugar) ---- */
+.mercado{margin-bottom:16px}
+.mtiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:10px}
+.mtile{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.mtile h4{margin:0 0 8px;font-size:14px}
+.mtile h4 span{font-weight:500;font-size:12px;color:var(--muted)}
+.mlin{display:grid;grid-template-columns:96px 1fr;gap:4px 10px;align-items:baseline;font-size:12.5px;margin-bottom:8px}
+.mlin span{color:var(--muted)}
+.mlin b{font-size:18px;letter-spacing:-.01em}
+.mlin small{grid-column:2;color:var(--muted);font-size:11.5px;margin-top:-2px}
+.tag.ab{background:var(--chip)}
+.tag.ab.verde{background:var(--verde-bg);color:var(--verde)}.tag.ab.amarelo{background:var(--amarelo-bg);color:var(--amarelo)}.tag.ab.vermelho{background:var(--vermelho-bg);color:var(--vermelho)}
+.alug{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:18px}
+.atop{display:grid;grid-template-columns:auto 1fr;gap:6px 22px;align-items:center;margin-bottom:12px}
+.aret{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.aret.verde{color:var(--verde)}.aret.amarelo{color:var(--amarelo)}.aret.vermelho{color:var(--vermelho)}
+.aret span{display:block;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:4px}
+.anums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.anums div{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.anums span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.anums b{font-size:16px}
+.acomp{font-size:13px;margin:0 0 12px;padding:8px 10px;border-radius:8px;background:var(--chip)}
+.ocup{position:relative;height:96px;margin:4px 14px 6px}
+.ocup .trilho{top:44px}
+.ocup .zona{position:absolute;top:42px;height:10px;border-radius:5px}
+.ocup .zona.ruim{background:color-mix(in srgb,var(--vermelho) 30%,transparent)}
+.ocup .zona.media{background:color-mix(in srgb,var(--amarelo) 35%,transparent)}
+.ocup .zona.boa{background:color-mix(in srgb,var(--verde) 35%,transparent)}
+.ocup .marca{top:36px}
+.ocup .marca span{bottom:26px}
+.ocup .marca.mercado{background:var(--ink);width:3px}
+.ocup .marca.mercado span{bottom:auto;top:26px}
+.ocup .marca.empate{background:var(--vermelho)}.ocup .marca.alvo{background:var(--verde)}
+.ctab.cred div{grid-template-columns:1.5fr 1fr 1fr 1fr 1fr}
+@media (max-width:760px){
+  .atop{grid-template-columns:1fr}
+  .ctab.cred div{grid-template-columns:1.3fr 1fr 1fr;row-gap:0}
+  .ctab.cred div > :nth-child(3),.ctab.cred div > :nth-child(5){display:none}
+}
+
 /* ---- abas e operações ---- */
 .abas{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 18px}
 .abas button{background:none;border:none;border-bottom:3px solid transparent;padding:10px 14px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
@@ -266,6 +306,7 @@ details.tec[open] summary{margin-bottom:10px}
       <div class="chart"><canvas id="gDispersao"></canvas></div>
     </div>
   </section>
+  <section class="card mercado" id="mercado" hidden></section>
   <div class="acoes">
     <button class="chip prim" id="btnCad">+ Cadastrar imóvel</button>
     <button class="chip" id="btnCsv" hidden>Baixar meus cadastros (planilha)</button>
@@ -321,7 +362,7 @@ function imovelDoCadastro(c){
     url: c.url || "", valor_avaliacao: null, data_leilao: null, modalidade: null,
     ocupado: c.ocupado ?? null, aceita_financiamento: c.aceita_financiamento ?? null,
     debitos: c.debitos || null, reforma_m2: c.reforma_m2 || null };
-  return SIM.analiseCompleta(im, rb, C);
+  return SIM.analiseCompleta(im, rb, C, D.airbnb);
 }
 
 if (window.SIM && C) {
@@ -378,13 +419,14 @@ function desenharGraficos(){
 }
 
 // ---------- filtros ----------
-const F = { bairro: "todos", origem: "todas", sem: "todos" };
+const F = { bairro: "todos", origem: "todas", sem: "todos", ab: "todos" };
 function chips(){
   const grupo = (chave, opcoes) => opcoes.map(([v,l]) => `<button class="chip ${F[chave]===v?"on":""}" data-k="${chave}" data-v="${v}">${l}</button>`).join("");
   $("#filtros").innerHTML =
     grupo("bairro", [["todos","Todos"], ...Object.keys(D.bairros).map(b => [b,b])]) + '<span class="sep"></span>' +
     grupo("origem", [["todas","Leilão + venda"],["leilao","Leilão"],["venda","Venda"], ...(D.imoveis.some(i => i.cadastro) ? [["meus","Meus cadastros"]] : [])]) + '<span class="sep"></span>' +
-    grupo("sem", [["todos","Todos"],["verde","Só verdes"],["amarelo","Verdes + amarelos"]]);
+    grupo("sem", [["todos","Todos"],["verde","Só verdes"],["amarelo","Verdes + amarelos"]]) +
+    (D.airbnb ? '<span class="sep"></span>' + grupo("ab", [["todos","Revenda"],["bom","Bom para Airbnb"]]) : "");
   document.querySelectorAll("#filtros .chip").forEach(c => c.onclick = () => { F[c.dataset.k] = c.dataset.v; chips(); lista(); });
 }
 
@@ -534,6 +576,7 @@ function detalhe(i){
     <div class="opcoes">${cards}</div>
     <h3>Simule</h3>
     <div class="sim" data-sim="${i.id}"></div>
+    ${a.aluguel ? `<h3>E se reformar e alugar no Airbnb?</h3><div class="alug" data-alug="${i.id}"></div>` : ""}
     <div class="cols2">${vendaBox}${destino}</div>
     <details class="tec" data-id="${i.id}">
       <summary>Detalhes técnicos — tabela completa, custos, prazo de venda e quando quitar</summary>
@@ -646,6 +689,148 @@ function simulador(box, i){
   desenhar();
 }
 
+// ---------- Airbnb: mercado do bairro (aba Oportunidades) ----------
+function mercadoCard(){
+  const AB = D.airbnb; if (!AB) return;
+  const el = $("#mercado"), A = AB.parametros, dBR = s => s.split("-").reverse().slice(0, 2).join("/");
+  const com = D.imoveis.filter(i => i.analise.aluguel);
+  const bons = com.filter(i => i.analise.aluguel.semaforo !== "vermelho").length;
+  el.hidden = false;
+  el.innerHTML = `
+    <h2>Airbnb: aluguel por temporada (até 1 quarto)</h2>
+    <p class="nota">Apartamentos inteiros no Airbnb, coletados em ${AB.coletado_em}. Diária de uma semana comum
+      (${dBR(AB.semana_referencia[0])} a ${dBR(AB.semana_referencia[1])}), sem a taxa de limpeza. Ocupação = noites já
+      reservadas nos próximos 30 dias, que ainda sobem com as reservas de última hora.</p>
+    <div class="mtiles">${Object.entries(AB.bairros).map(([b, r]) => {
+      const d = r.diaria, o = r.ocupacao_30d;
+      if (!d || !o) return `<div class="mtile"><h4>${b} <span>· ${r.anuncios} anúncios</span></h4><p class="sub">Poucos anúncios para calcular.</p></div>`;
+      return `<div class="mtile"><h4>${b} <span>· ${r.anuncios} anúncios</span></h4>
+        <div class="mlin"><span>Diária</span><b>${brl(d.mediana)}</b><small>metade dos anúncios entre ${brl(d.p25)} e ${brl(d.p75)}</small></div>
+        <div class="mlin"><span>Ocupação</span><b>${pct(o.mediana, 0)}</b><small>metade entre ${pct(o.p25, 0)} e ${pct(o.p75, 0)}</small></div>
+        <div class="mlin"><span>Receita do mês</span><b>${brl(d.mediana * 365 / 12 * Math.min(o.mediana * (A.ocupacao_ajuste ?? 1), 1))}</b><small>antes da taxa do Airbnb e dos custos</small></div>
+        ${r.anuncios < 30 ? '<p class="sub" style="margin:0">Poucos anúncios: use com cuidado.</p>' : ""}</div>`;
+    }).join("")}</div>
+    <p class="sub" style="margin:10px 0 0">${bons} de ${com.length} imóveis analisados rendem pelo menos ${pct(A.retorno_alerta_aa, 0)} ao ano alugando
+      (verde a partir de ${pct(A.retorno_minimo_aa, 0)}). Use o filtro <b>Bom para Airbnb</b> e abra o imóvel para ver a conta.</p>`;
+}
+
+// ---------- Airbnb: reformar e alugar (detalhe do imóvel) ----------
+function aluguelBox(box, i){
+  const AB = D.airbnb, A0 = AB.parametros, base = i.analise.aluguel, P = i.analise.premissas, e0 = base.cenarios.esperado;
+  const metaA = A0.retorno_minimo_aa, alertaA = A0.retorno_alerta_aa;
+  const corA = r => r >= metaA ? "verde" : r >= alertaA ? "amarelo" : "vermelho";
+  const inicial = () => ({ diaria: e0.diaria, ocup: e0.ocupacao * 100, gestao: A0.gestao_pct * 100, mobilia: A0.mobilia });
+  const ini = inicial();
+  let v = { ...ini };
+  const fmt = { diaria: x => brl(x), ocup: x => pct(x / 100, 0), gestao: x => x ? pct(x / 100, 0) + " da receita" : "você mesmo cuida", mobilia: brl };
+  const ctl = (k, rot, min, max, step) => `<label data-k="${k}"><span class="lin">${rot}<b data-v="${k}"></b></span>
+    <input type="range" min="${min}" max="${max}" step="${step}" data-k="${k}"></label>`;
+  const curto = n => n.replace("Carta contemplada", "Consórcio").replace(" (capital próprio)", "");
+  const rec = i.analise.modalidades.find(m => m.nome === i.analise.melhor);
+  const studio = i.quartos === 0 || (i.quartos == null && i.area < 30);
+
+  const cen = base.cenarios, tile = (rot, c, dest) => `<div class="${dest ? "dest" : ""}"><span>${rot}</span><b>${brl(c.liquido)}/mês</b>
+    <small>${brl(c.diaria)} × ${pct(c.ocupacao, 0)}</small><small>${pct(c.retorno_aa)} ao ano</small></div>`;
+
+  box.innerHTML = `
+    <div class="sim-fixo" data-fixo></div>
+    <p class="nota" style="margin:0 0 10px;font-size:12px;color:var(--muted)">Em vez de revender, mobiliar e alugar por temporada.
+      Começa com a diária e a ocupação típicas de ${i.bairro}; mexa e veja a renda mudar. Nada é salvo.</p>
+    <div class="sim-ctl">
+      ${ctl("diaria", "Diária", 150, 1500, 10)}
+      ${ctl("ocup", "Ocupação (noites alugadas)", 5, 100, 1)}
+      ${ctl("gestao", "Administradora", 0, 30, 1)}
+      ${ctl("mobilia", "Mobília e enxoval", 0, 80000, 2500)}
+    </div>
+    <div class="atop">
+      <div class="aret" data-ret></div>
+      <div class="anums" data-nums></div>
+    </div>
+    <p class="acomp" data-comp></p>
+    <div class="cols2">
+      <div class="bloco">
+        <h3 data-pilha-tit>Para onde vai a receita do mês</h3>
+        <div class="pilha" data-pilha></div>
+        <div class="legenda" data-leg></div>
+      </div>
+      <div class="bloco">
+        <h3>Quanta ocupação precisa</h3>
+        <div class="ocup" data-ocup></div>
+        <p class="sub" data-ocup-txt style="margin:4px 0 0"></p>
+      </div>
+    </div>
+    <h3>Com os números do mercado de ${i.bairro}${base.anuncios ? ` (${base.anuncios} anúncios)` : ""}</h3>
+    <div class="tres">${tile("Pessimista", cen.pessimista)}${tile("Esperado", cen.esperado, true)}${tile("Otimista", cen.otimista)}</div>
+    <div data-cred></div>
+    <div class="sim-rodape" style="margin-top:10px"><span>${studio ? "Studio/conjugado: a diária tende a ser menor que a de 1 quarto (os anúncios coletados são de 1 quarto). " : ""}Taxa do Airbnb ${pct(A0.taxa_plataforma)}, contas ${brl(A0.contas_mensais)}/mês e IR ${pct(A0.aliquota_ir, 0)} vêm do config.yaml. Não conta a valorização do imóvel.</span>
+      <button class="chip" data-reset>Voltar aos valores do mercado</button></div>`;
+
+  function calc(){
+    const d = +v.diaria, o = Math.min(v.ocup / 100, 1);
+    const mercado = { diaria: { p25: d, mediana: d, p75: d }, ocupacao_30d: { p25: o, mediana: o, p75: o }, anuncios: base.anuncios };
+    return SIM.aluguel(P, mercado, { ...A0, gestao_pct: v.gestao / 100, mobilia: +v.mobilia, ocupacao_ajuste: 1 }, D.simulador, i.aceita_financiamento);
+  }
+
+  function desenhar(){
+    box.querySelectorAll("input[type=range]").forEach(el => {
+      const k = el.dataset.k; el.value = v[k];
+      box.querySelector(`[data-v="${k}"]`).textContent = fmt[k](+v[k]);
+      el.closest("label").classList.toggle("mud", Math.abs(v[k] - ini[k]) > 1e-9);
+    });
+    const r = calc(), e = r.cenarios.esperado, c = corA(r.retorno_aa);
+    const ret = box.querySelector("[data-ret]");
+    ret.className = "aret " + c;
+    ret.innerHTML = `${pct(r.retorno_aa)}<span>ao ano sobre o investido · meta ${pct(metaA, 0)}</span>`;
+    box.querySelector("[data-nums]").innerHTML = [
+      ["Renda líquida por mês", brl(e.liquido), e.liquido < 0 ? "neg" : ""],
+      ["Investimento", brl(r.investimento)],
+      ["Recupera em", r.anos_para_recuperar ? r.anos_para_recuperar.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "não recupera"],
+      ["Noites por mês", Math.round(e.noites)],
+    ].map(([l, x, cl]) => `<div><span>${l}</span><b class="${cl || ""}">${x}</b></div>`).join("");
+    box.querySelector("[data-fixo]").innerHTML = `<span>Airbnb <b class="${c}">${pct(r.retorno_aa)} a.a.</b></span><span>renda <b>${brl(e.liquido)}</b>/mês</span><span>revender <b class="${i.analise.semaforo}">${pct(i.analise.margem_melhor)}</b></span>`;
+    box.querySelector("[data-comp]").innerHTML = `<b>Revender</b> (${curto(rec.nome)}): lucro de ${brl(rec.lucro)} em ${i.analise.prazo_meses} meses e o dinheiro volta.
+      <b>Alugar</b>: ${brl(e.liquido * 12)} por ano, começando depois de ${r.meses_sem_renda} meses de ${r.meses_sem_renda > P.meses_reforma ? "desocupação e " : ""}obra, e o imóvel continua seu.
+      ${r.retorno_aa >= D.rendimento_alternativo_aa ? "Rende mais que deixar o dinheiro aplicado." : `O mesmo dinheiro aplicado a ${pct(D.rendimento_alternativo_aa, 0)} renderia ${brl(r.investimento * D.rendimento_alternativo_aa)} por ano.`}`;
+
+    const partes = [["Taxa do Airbnb", e.taxa, "p5"], ["Administradora", e.gestao, "p4"], ["Condomínio e IPTU", e.condominio_iptu, "p2"],
+                    ["Luz, internet, reposição", e.contas, "p1"], ["IR", e.ir, "p3"]];
+    if (e.liquido > 0) partes.push(["Sobra para você", e.liquido, "p6"]);
+    const tot = Math.max(e.receita, partes.reduce((s, p) => s + p[1], 0)) || 1;
+    box.querySelector("[data-pilha-tit]").textContent = `Para onde vai a receita do mês (${brl(e.receita)})`;
+    box.querySelector("[data-pilha]").innerHTML = partes.filter(p => p[1] > 0).map(p => `<div class="${p[2]}" style="width:${(p[1] / tot * 100).toFixed(2)}%" title="${p[0]}: ${brl(p[1])}"></div>`).join("");
+    box.querySelector("[data-leg]").innerHTML = partes.filter(p => p[1] > 0).map(p => `<span><i class="${p[2]}"></i>${p[0]} <b>${brl(p[1])}</b></span>`).join("")
+      + (e.liquido <= 0 ? `<span style="grid-column:1/-1"><b class="neg">A receita não cobre os custos: faltam ${brl(-e.liquido)} por mês.</b></span>` : "");
+
+    const x = f => `${(Math.min(Math.max(f, 0), 1) * 100).toFixed(1)}%`;
+    const emp = r.ocupacao_empate, alvo = r.ocupacao_meta, oc = e.ocupacao;
+    box.querySelector("[data-ocup]").innerHTML = `<div class="trilho"></div>
+      ${emp != null ? `<div class="zona ruim" style="left:0;width:${x(emp)}"></div>
+        <div class="zona media" style="left:${x(emp)};width:${x((alvo ?? 1) - emp)}"></div>` : ""}
+      ${alvo != null ? `<div class="zona boa" style="left:${x(alvo)};width:${x(1 - alvo)}"></div>` : ""}
+      ${emp != null ? `<div class="marca empate" style="left:${x(emp)}"><span>empata<br><b>${pct(emp, 0)}</b></span></div>` : ""}
+      ${alvo != null ? `<div class="marca alvo" style="left:${x(alvo)}"><span>bate ${pct(metaA, 0)}<br><b>${pct(alvo, 0)}</b></span></div>` : ""}
+      <div class="marca mercado" style="left:${x(oc)}"><span><b>${pct(oc, 0)}</b><br>usada</span></div>`;
+    box.querySelector("[data-ocup-txt]").innerHTML = emp == null ? "<b>Nem com 100% de ocupação a receita cobre os custos.</b>"
+      : `Abaixo de ${pct(emp, 0)} de ocupação o mês dá prejuízo. ${alvo != null
+        ? `Para render ${pct(metaA, 0)} ao ano precisa de <b>${pct(alvo, 0)}</b> (${Math.round(alvo * 365 / 12)} noites por mês) com diária de ${brl(e.diaria)}.`
+        : `Com diária de ${brl(e.diaria)} não chega a ${pct(metaA, 0)} ao ano nem com 100%.`}`;
+
+    box.querySelector("[data-cred]").innerHTML = r.credito.length ? `
+      <h3>O aluguel paga a parcela?</h3>
+      <div class="ctab cred">
+        <div class="ch"><span>Forma de pagar</span><span>Do seu bolso</span><span>1ª parcela</span><span>Sobra no mês</span><span>Retorno s/ bolso</span></div>
+        <div><span>À vista</span><span>${brl(r.investimento)}</span><span>—</span><b class="${e.liquido < 0 ? "neg" : "pos"}">${brl(e.liquido)}</b><span>${pct(r.retorno_aa)}</span></div>
+        ${r.credito.map(m => `<div><span>${curto(m.nome)}</span><span>${brl(m.bolso)}</span><span>${brl(m.parcela)}</span><b class="${m.sobra < 0 ? "neg" : "pos"}">${m.sobra < 0 ? "falta " + brl(-m.sobra) : brl(m.sobra)}</b><span>${pct(m.retorno_bolso_aa)}</span></div>`).join("")}
+      </div>
+      <p class="sub" style="margin:6px 0 0">Parte da parcela é amortização: vira patrimônio, não é despesa. "Falta" = você completa todo mês.</p>`
+      : (i.aceita_financiamento === false ? '<p class="sub">Este imóvel não aceita financiamento nem carta: só à vista.</p>' : "");
+  }
+
+  box.addEventListener("input", ev => { const k = ev.target.dataset.k; if (!k) return; v[k] = +ev.target.value; desenhar(); });
+  box.querySelector("[data-reset]").onclick = () => { v = inicial(); desenhar(); };
+  desenhar();
+}
+
 function sensGrafico(i){
   const a = i.analise, el = document.getElementById("s" + i.id);
   if (!el || el.dataset.ok) return;
@@ -666,7 +851,8 @@ function filtrados(){
   return D.imoveis.filter(i =>
     (F.bairro==="todos" || i.bairro===F.bairro) &&
     (F.origem==="todas" || (F.origem==="meus" ? i.cadastro : i.origem===F.origem)) &&
-    (F.sem==="todos" || (F.sem==="verde" ? i.analise.semaforo==="verde" : i.analise.semaforo!=="vermelho")));
+    (F.sem==="todos" || (F.sem==="verde" ? i.analise.semaforo==="verde" : i.analise.semaforo!=="vermelho")) &&
+    (F.ab==="todos" || (i.analise.aluguel && i.analise.aluguel.semaforo!=="vermelho")));
 }
 
 function lista(){
@@ -682,7 +868,8 @@ function lista(){
           <div class="meta">${i.cadastro ? '<span class="tag meu">Meu cadastro</span>' : ""}<span class="tag ${i.origem}">${i.origem==="leilao"?"Leilão":"Venda"}</span>
             <span>${i.bairro}</span><span>${brl(i.preco)}</span><span>${Math.round(i.area)} m²</span>
             <span>${brl(i.preco_m2)}/m² (${pct(i.desconto_mercado,0)} vs ${brl(ref)})</span>
-            ${i.data_leilao?`<span>leilão ${i.data_leilao}</span>`:""}</div>
+            ${i.data_leilao?`<span>leilão ${i.data_leilao}</span>`:""}
+            ${a.aluguel?`<span class="tag ab ${a.aluguel.semaforo}" title="Reformar e alugar no Airbnb: renda líquida do ano ÷ investimento">Airbnb ${pct(a.aluguel.retorno_aa)} a.a.</span>`:""}</div>
         </div>
         <div class="marg"><div class="v ${a.semaforo}">${pct(a.margem_melhor)}</div><div class="l">${a.melhor}</div></div>
       </div>
@@ -697,12 +884,13 @@ function alternar(el){
   if (!det.innerHTML) {
     det.innerHTML = detalhe(i);
     const sb = det.querySelector("[data-sim]"); if (sb && i.analise.premissas && window.SIM) simulador(sb, i);
+    const ab = det.querySelector("[data-alug]"); if (ab && window.SIM) aluguelBox(ab, i);
     det.querySelector("details.tec").addEventListener("toggle", e => { if (e.target.open) sensGrafico(i); });
   }
   el.classList.toggle("aberto");
 }
 function abrir(idx){
-  F.bairro = "todos"; F.origem = "todas"; F.sem = "todos"; chips(); lista();
+  F.bairro = "todos"; F.origem = "todas"; F.sem = "todos"; F.ab = "todos"; chips(); lista();
   const el = document.getElementById("im" + idx); if (!el) return;
   if (!el.classList.contains("aberto")) alternar(el);
   el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -797,7 +985,7 @@ $("#lista").addEventListener("click", e => {
   if (ex && confirm("Excluir este imóvel cadastrado?")) { gravarCad(lerCad().filter(c => c.id !== ex)); location.hash = ""; location.reload(); }
 });
 
-chips(); lista(); desenharGraficos();
+mercadoCard(); chips(); lista(); desenharGraficos();
 { const m = location.hash.match(/^#cad=(.+)$/);
   if (m) { const idx = D.imoveis.findIndex(i => i.id === m[1]); if (idx >= 0) abrir(idx); history.replaceState(null, "", location.pathname); } }
 })();
